@@ -8,9 +8,11 @@ from catalyst.dl.runner import SupervisedRunner
 from catalyst.dl import utils
 
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR
 
-from cloud.io.dataset import CloudDataset
-from .utils import get_preprocessing, get_training_augmentation, get_validation_augmentation
+from clouds.io.dataset import CloudDataset
+from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation
 
 def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16, encoder="resnet50",
          test_size=0.1):
@@ -26,10 +28,16 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
     train = pd.read_csv(f"{path}/train.csv")
     sub = pd.read_csv(f"{path}/sample_submission.csv")
 
+    # setting the dataframe for training/inference
+    train['label'] = train['Image_Label'].apply(lambda x: x.split('_')[1])
+    train['im_id'] = train['Image_Label'].apply(lambda x: x.split('_')[0])
+
+    sub['label'] = sub['Image_Label'].apply(lambda x: x.split('_')[1])
+    sub['im_id'] = sub['Image_Label'].apply(lambda x: x.split('_')[0])
     id_mask_count = train.loc[train["EncodedPixels"].isnull() == False, "Image_Label"].apply(lambda x: x.split("_")[0]).value_counts().\
-    reset_index().rename(columns={"index": "img_id", "Image_Label": "count"})
+    reset_index().rename(columns={"index": "im_id", "Image_Label": "count"})
     # setting up the train/val split with filenames
-    train_ids, valid_ids = train_test_split(id_mask_count["img_id"].values, random_state=42,
+    train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=42,
                                             stratify=id_mask_count["count"], test_size=test_size)
     test_ids = sub["Image_Label"].apply(lambda x: x.split("_")[0]).drop_duplicates().values
 
@@ -48,9 +56,9 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
 
     # Setting up the I/O
     num_workers = 0
-    train_dataset = CloudDataset(df=train, datatype="train", img_ids=train_ids,
+    train_dataset = CloudDataset(path, df=train, datatype="train", im_ids=train_ids,
                                  transforms=get_training_augmentation(), preprocessing=get_preprocessing(preprocessing_fn))
-    valid_dataset = CloudDataset(df=train, datatype="valid", img_ids=valid_ids,
+    valid_dataset = CloudDataset(path, df=train, datatype="valid", im_ids=valid_ids,
                                  transforms=get_validation_augmentation(), preprocessing=get_preprocessing(preprocessing_fn))
 
     train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True, num_workers=num_workers)
@@ -106,5 +114,7 @@ if __name__ == "__main__":
                         help="one of the encoders in https://github.com/qubvel/segmentation_models.pytorch")
     parser.add_argument("--test_size", type=float, required=False, default=0.1,
                         help="Fraction of total dataset to make the validation set.")
-    main(path=parser.dset_path, num_epochs=parser.num_epochs, bs=parser.batch_size,
-         encoder=parser.encoder, test_size=parser.test_size)
+    args = parser.parse_args()
+
+    main(path=args.dset_path, num_epochs=args.num_epochs, bs=args.batch_size,
+         encoder=args.encoder, test_size=args.test_size)
