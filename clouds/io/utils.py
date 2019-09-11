@@ -2,6 +2,7 @@ import cv2
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 def get_img(x, folder: str='train_images'):
     """
