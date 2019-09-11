@@ -1,5 +1,7 @@
 import albumentations as albu
 
+from clouds.io.utils import to_tensor
+
 def get_training_augmentation():
     train_transform = [
 
