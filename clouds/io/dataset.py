@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 from .utils import make_mask
 
 class CloudDataset(Dataset):
-    def __init__(self, df: pd.DataFrame=None, datatype: str="train", img_ids: np.array=None,
+    def __init__(self, path: str, df: pd.DataFrame=None, datatype: str="train", im_ids: np.array=None,
                  transforms = albu.Compose([albu.HorizontalFlip(), AT.ToTensor()]),
                  preprocessing=None):
         self.df = df
@@ -18,7 +18,7 @@ class CloudDataset(Dataset):
             self.data_folder = f"{path}/train_images"
         else:
             self.data_folder = f"{path}/test_images"
-        self.img_ids = img_ids
+        self.img_ids = im_ids
         self.transforms = transforms
         self.preprocessing = preprocessing
 
