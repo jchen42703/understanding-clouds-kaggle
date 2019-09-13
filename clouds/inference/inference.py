@@ -1,52 +1,38 @@
+import numpy as np
+import cv2
 import tqdm
-import gc
 
-torch.cuda.empty_cache()
-gc.collect()
+from clouds.io.utils import mask2rle, post_process, sigmoid
 
-test_dataset = CloudDataset(df=sub, datatype='test', img_ids=test_ids, transforms = get_validation_augmentation(), preprocessing=get_preprocessing(preprocessing_fn))
-test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=0)
-
-loaders = {"test": test_loader}
-
-def get_probabilities():
+def get_encoded_pixels(loaders, runners, class_params):
+    """
+    Processes predicted logits and converts them to encoded pixels. Does so in an iterative
+    manner so operations are done image-wise rather than on the full dataset directly (to
+    combat RAM limitations).
+    Args:
+        loaders: dictionary of data loaders with at least the key: "test"
+        runner (an instance of a catalyst.dl.runner.SupervisedRunner):
+        sub (pandas.DataFrame): sample submission dataframe. This is used to
+            create the final submission dataframe.
+        class_params (dict): with keys class: (threshold, minimum component size)
+    """
     encoded_pixels = []
-    loaders = {"infer": valid_loader}
-    runner.infer(
-        model=model,
-        loaders=loaders,
-        callbacks=[
-            CheckpointCallback(
-                resume=f"{logdir}/checkpoints/best.pth"),
-            InferCallback()
-        ],
-    )
-    valid_masks = []
-    probabilities = np.zeros((2220, 350, 525))
-    for i, (batch, output) in enumerate(tqdm.tqdm(zip(
-            valid_dataset, runner.callbacks[0].predictions["logits"]))):
-        image, mask = batch
-        for m in mask:
-            if m.shape != (350, 525):
-                m = cv2.resize(m, dsize=(525, 350), interpolation=cv2.INTER_LINEAR)
-            valid_masks.append(m)
-
-        for j, probability in enumerate(output):
-            if probability.shape != (350, 525):
-                probability = cv2.resize(probability, dsize=(525, 350), interpolation=cv2.INTER_LINEAR)
-            probabilities[i * 4 + j, :, :] = probability
-def create_submission():
-    encoded_pixels = []
-    for i, test_batch in enumerate(tqdm.tqdm(loaders['test'])):
-        runner_out = runner.predict_batch({"features": test_batch[0].cuda()})['logits']
+    image_id = 0
+    for i, test_batch in enumerate(tqdm.tqdm(loaders["test"])):
+        runner_out = runner.predict_batch({"features": test_batch[0].cuda()})["logits"]
+        # for each batch (n, h, w): resize and post_process
         for i, batch in enumerate(runner_out):
             for probability in batch:
+                # iterating through each probability map (h, w)
                 probability = probability.cpu().detach().numpy()
                 if probability.shape != (350, 525):
                     probability = cv2.resize(probability, dsize=(525, 350), interpolation=cv2.INTER_LINEAR)
-                predict, num_predict = post_process(sigmoid(probability), best_threshold, best_size)
+                predict, num_predict = post_process(sigmoid(probability), class_params[image_id % 4][0],
+                                                    class_params[image_id % 4][1])
                 if num_predict == 0:
-                    encoded_pixels.append('')
+                    encoded_pixels.append("")
                 else:
                     r = mask2rle(predict)
                     encoded_pixels.append(r)
+                image_id += 1
+    return encoded_pixels
