@@ -4,7 +4,7 @@ import tqdm
 
 from clouds.io.utils import mask2rle, post_process, sigmoid
 
-def get_encoded_pixels(loaders, runners, class_params):
+def get_encoded_pixels(loaders, runner, class_params):
     """
     Processes predicted logits and converts them to encoded pixels. Does so in an iterative
     manner so operations are done image-wise rather than on the full dataset directly (to
