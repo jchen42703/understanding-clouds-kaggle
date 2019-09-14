@@ -19,13 +19,15 @@ def get_encoded_pixels(loaders, runner, class_params):
     encoded_pixels = []
     image_id = 0
     for i, test_batch in enumerate(tqdm.tqdm(loaders["test"])):
+        # pred shape: (batch_size, 4, h, w)
         runner_out = runner.predict_batch({"features": test_batch[0].cuda()})["logits"]
-        # for each batch (n, h, w): resize and post_process
+        # for each batch (4, h, w): resize and post_process
         for i, batch in enumerate(runner_out):
             for probability in batch:
                 # iterating through each probability map (h, w)
                 probability = probability.cpu().detach().numpy()
                 if probability.shape != (350, 525):
+                    # cv2 -> (w, h); np -> (h, w)
                     probability = cv2.resize(probability, dsize=(525, 350), interpolation=cv2.INTER_LINEAR)
                 predict, num_predict = post_process(sigmoid(probability), class_params[image_id % 4][0],
                                                     class_params[image_id % 4][1])
