@@ -14,7 +14,7 @@ from catalyst.dl.callbacks import InferCallback, CheckpointCallback
 from catalyst.dl.runner import SupervisedRunner
 
 from clouds.io.dataset import CloudDataset
-from cloud.io.utils import post_process, mask2rle, sigmoid
+from clouds.io.utils import post_process, mask2rle, sigmoid
 from utils import get_validation_augmentation, get_preprocessing
 from clouds.inference.inference import get_encoded_pixels
 
@@ -47,7 +47,7 @@ def main(path, bs=8, encoder="resnet32"):
     # valid_dataset = CloudDataset(path, df=train, datatype="valid", im_ids=valid_ids,
                                  # transforms=get_validation_augmentation(),
                                  # preprocessing=get_preprocessing(preprocessing_fn))
-    test_dataset = CloudDataset(path, df=sub, datatype="test", img_ids=test_ids,
+    test_dataset = CloudDataset(path, df=sub, datatype="test", im_ids=test_ids,
                                 transforms=get_validation_augmentation(),
                                 preprocessing=get_preprocessing(preprocessing_fn))
     # valid_loader = DataLoader(valid_dataset, batch_size=bs, shuffle=False, num_workers=num_workers)
@@ -57,7 +57,7 @@ def main(path, bs=8, encoder="resnet32"):
     # loaders = {"valid": valid_loader, "test": test_loader}
     loaders = {"test": test_loader}
 
-    create_submission(loaders=loaders, runner=runner, sub=sub)
+    create_submission(model=model, loaders=loaders, runner=runner, sub=sub)
 
 def setup_train_and_sub_df(path):
     """
@@ -77,10 +77,11 @@ def setup_train_and_sub_df(path):
     reset_index().rename(columns={"index": "im_id", "Image_Label": "count"})
     return (train, sub)
 
-def create_submission(loaders, runner, sub, class_params="default"):
+def create_submission(model, loaders, runner, sub, class_params="default"):
     """
     runner: with .infer set
     Args:
+        model (nn.Module): Segmentation module that outputs logits
         loaders: dictionary of data loaders with at least the key: "test"
         runner (an instance of a catalyst.dl.runner.SupervisedRunner):
         sub (pandas.DataFrame): sample submission dataframe. This is used to
@@ -95,10 +96,11 @@ def create_submission(loaders, runner, sub, class_params="default"):
     ckpoint_path = os.path.join(logdir, "checkpoints", "best.pth")
     runner.infer(model=model, loaders=loaders, callbacks=[
             CheckpointCallback(
-                resume=ckpoint_path,
+                resume=ckpoint_path,)
         ],
     )
-    encoded_pixels = get_encoded_pixels(loaders=loaders, runners=runners,
+    print("Converting predicted masks to rle's...")
+    encoded_pixels = get_encoded_pixels(loaders=loaders, runner=runner,
                                         class_params=class_params)
     # Saving the submission dataframe
     sub["EncodedPixels"] = encoded_pixels
