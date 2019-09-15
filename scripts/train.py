@@ -31,7 +31,7 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
     sub = pd.read_csv(f"{path}/sample_submission.csv")
 
     # setting up the train/val split with filenames
-    train, sub = setup_train_and_sub_df(path)
+    train, sub, id_mask_count = setup_train_and_sub_df(path)
     # setting up the train/val split with filenames
     train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=split_seed,
                                             stratify=id_mask_count["count"], test_size=test_size)
@@ -51,10 +51,10 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
     # Setting up the I/O
     num_workers = 0
     train_dataset = CloudDataset(path, df=train, datatype="train", im_ids=train_ids,
-                                 transforms=get_training_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn)
+                                 transforms=get_training_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn),
                                  use_resized_dataset=use_resized_dataset)
     valid_dataset = CloudDataset(path, df=train, datatype="valid", im_ids=valid_ids,
-                                 transforms=get_validation_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn)
+                                 transforms=get_validation_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn),
                                  use_resized_dataset=use_resized_dataset)
 
     train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True, num_workers=num_workers)
@@ -125,8 +125,7 @@ if __name__ == "__main__":
                         help="one of the encoders in https://github.com/qubvel/segmentation_models.pytorch")
     parser.add_argument("--test_size", type=float, required=False, default=0.1,
                         help="Fraction of total dataset to make the validation set.")
-    add_bool_arg(parser, "use_resized_dataset", required=False, default=False,
-                 help="Whether or not you are using the original or the pre-resized dataset")
+    add_bool_arg(parser, "use_resized_dataset", default=False)
     parser.add_argument("--split_seed", type=int, required=False, default=42,
                         help="Seed for the train/val dataset split")
     args = parser.parse_args()
