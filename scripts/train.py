@@ -12,10 +12,10 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR
 
 from clouds.io.dataset import CloudDataset
-from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation
+from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, setup_train_and_sub_df
 
 def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16, encoder="resnet50",
-         test_size=0.1):
+         test_size=0.1, use_resized_dataset=False, split_seed=42):
     """
     Main code for training.
     Args:
@@ -23,24 +23,18 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
         num_epochs (int): number of epochs to train for
         bs (int): batch size
         encoder (str): one of the encoders in https://github.com/qubvel/segmentation_models.pytorch
+        use_resized_dataset (bool): Whether or not you are using the original or the pre-resized dataset
+        split_seed (int): seed for the dataset split
     """
     # Reading the in the .csvs
     train = pd.read_csv(f"{path}/train.csv")
     sub = pd.read_csv(f"{path}/sample_submission.csv")
 
-    # setting the dataframe for training/inference
-    train['label'] = train['Image_Label'].apply(lambda x: x.split('_')[1])
-    train['im_id'] = train['Image_Label'].apply(lambda x: x.split('_')[0])
-
-    sub['label'] = sub['Image_Label'].apply(lambda x: x.split('_')[1])
-    sub['im_id'] = sub['Image_Label'].apply(lambda x: x.split('_')[0])
-    id_mask_count = train.loc[train["EncodedPixels"].isnull() == False, "Image_Label"].apply(lambda x: x.split("_")[0]).value_counts().\
-    reset_index().rename(columns={"index": "im_id", "Image_Label": "count"})
     # setting up the train/val split with filenames
-    train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=42,
+    train, sub, id_mask_count = setup_train_and_sub_df(path)
+    # setting up the train/val split with filenames
+    train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=split_seed,
                                             stratify=id_mask_count["count"], test_size=test_size)
-    test_ids = sub["Image_Label"].apply(lambda x: x.split("_")[0]).drop_duplicates().values
-
     # setting up model (U-Net with ImageNet Encoders)
     ENCODER_WEIGHTS = "imagenet"
     DEVICE = "cuda"
@@ -57,9 +51,11 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
     # Setting up the I/O
     num_workers = 0
     train_dataset = CloudDataset(path, df=train, datatype="train", im_ids=train_ids,
-                                 transforms=get_training_augmentation(), preprocessing=get_preprocessing(preprocessing_fn))
+                                 transforms=get_training_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn),
+                                 use_resized_dataset=use_resized_dataset)
     valid_dataset = CloudDataset(path, df=train, datatype="valid", im_ids=valid_ids,
-                                 transforms=get_validation_augmentation(), preprocessing=get_preprocessing(preprocessing_fn))
+                                 transforms=get_validation_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn),
+                                 use_resized_dataset=use_resized_dataset)
 
     train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True, num_workers=num_workers)
     valid_loader = DataLoader(valid_dataset, batch_size=bs, shuffle=False, num_workers=num_workers)
@@ -97,6 +93,21 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
         metrics=["loss", "dice", "lr", "_base/lr"]
     )
 
+def add_bool_arg(parser, name, default=False):
+    """
+    From: https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+    Handles boolean cases from command line through the creating two mutually exclusive arguments: --name and --no-name.
+    Args:
+        parser (arg.parse.ArgumentParser): the parser you want to add the arguments to
+        name: name of the common feature name for the two mutually exclusive arguments; dest = name
+        default: default boolean for command line
+    Returns:
+        None
+    """
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument("--" + name, dest=name, action="store_true")
+    group.add_argument("--no-" + name, dest=name, action="store_false")
+    parser.set_defaults(**{name:default})
 
 if __name__ == "__main__":
     import argparse
@@ -114,7 +125,11 @@ if __name__ == "__main__":
                         help="one of the encoders in https://github.com/qubvel/segmentation_models.pytorch")
     parser.add_argument("--test_size", type=float, required=False, default=0.1,
                         help="Fraction of total dataset to make the validation set.")
+    add_bool_arg(parser, "use_resized_dataset", default=False)
+    parser.add_argument("--split_seed", type=int, required=False, default=42,
+                        help="Seed for the train/val dataset split")
     args = parser.parse_args()
 
     main(path=args.dset_path, num_epochs=args.num_epochs, bs=args.batch_size,
-         encoder=args.encoder, test_size=args.test_size)
+         encoder=args.encoder, test_size=args.test_size, use_resized_dataset=args.use_resized_dataset,
+         split_seed=args.split_seed)
