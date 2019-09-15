@@ -15,10 +15,10 @@ from catalyst.dl.runner import SupervisedRunner
 
 from clouds.io.dataset import CloudDataset
 from clouds.io.utils import post_process, mask2rle, sigmoid
-from utils import get_validation_augmentation, get_preprocessing
+from utils import get_validation_augmentation, get_preprocessing, setup_train_and_sub_df
 from clouds.inference.inference import get_encoded_pixels
 
-def main(path, bs=8, encoder="resnet32"):
+def main(path, bs=8, encoder="resnet34"):
     """
     Args:
         path (str): Path to the dataset (unzipped)
