@@ -45,6 +45,25 @@ def make_mask(df: pd.DataFrame, image_name: str='img.jpg', shape: tuple=(1400, 2
 
     return masks
 
+def make_mask_resized_dset(df: pd.DataFrame, image_name: str='img.jpg',
+                           masks_dir: str="./masks",
+                           shape: tuple=(320, 640)):
+    """
+    Create mask based on df, image name and shape.
+    """
+    masks = np.zeros((shape[0], shape[1], 4), dtype=np.float32)
+    df = df[df["im_id"] == image_name]
+    for idx, im_name in enumerate(df["im_id"].values):
+        for classidx, classid in enumerate(["Fish", "Flower", "Gravel", "Sugar"]):
+            mask = cv2.imread(os.path.join(masks_dir, f"{classid}{im_name}"), cv2.IMREAD_GRAYSCALE)
+            if mask is None:
+                continue
+            # if mask[:,:,0].shape != (350,525):
+            #     mask = cv2.resize(mask, (525,350))
+            masks[:, :, classidx] = mask
+    masks = masks/255
+    return masks
+
 def to_tensor(x, **kwargs):
     """
     Convert image or mask.
