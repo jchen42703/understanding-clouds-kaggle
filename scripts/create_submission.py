@@ -39,7 +39,7 @@ def main(path, bs=8, encoder="resnet34"):
     # setting up the test I/O
     preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, ENCODER_WEIGHTS)
     # setting up the train/val split with filenames
-    train, sub = setup_train_and_sub_df(path)
+    train, sub, _ = setup_train_and_sub_df(path)
     # train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=42,
     #                                         stratify=id_mask_count["count"], test_size=test_size)
     test_ids = sub["Image_Label"].apply(lambda x: x.split("_")[0]).drop_duplicates().values
@@ -58,24 +58,6 @@ def main(path, bs=8, encoder="resnet34"):
     loaders = {"test": test_loader}
 
     create_submission(model=model, loaders=loaders, runner=runner, sub=sub)
-
-def setup_train_and_sub_df(path):
-    """
-    Sets up the training and sample submission DataFrame.
-    """
-    # Reading the in the .csvs
-    train = pd.read_csv(os.path.join(path, "train.csv"))
-    sub = pd.read_csv(os.path.join(path, "sample_submission.csv"))
-
-    # setting the dataframe for training/inference
-    train['label'] = train['Image_Label'].apply(lambda x: x.split('_')[1])
-    train['im_id'] = train['Image_Label'].apply(lambda x: x.split('_')[0])
-
-    sub['label'] = sub['Image_Label'].apply(lambda x: x.split('_')[1])
-    sub['im_id'] = sub['Image_Label'].apply(lambda x: x.split('_')[0])
-    id_mask_count = train.loc[train["EncodedPixels"].isnull() == False, "Image_Label"].apply(lambda x: x.split("_")[0]).value_counts().\
-    reset_index().rename(columns={"index": "im_id", "Image_Label": "count"})
-    return (train, sub)
 
 def create_submission(model, loaders, runner, sub, class_params="default"):
     """
@@ -97,7 +79,7 @@ def create_submission(model, loaders, runner, sub, class_params="default"):
     runner.infer(model=model, loaders=loaders, callbacks=[
             CheckpointCallback(
                 resume=ckpoint_path,)
-        ],
+        ], verbose=True
     )
     print("Converting predicted masks to rle's...")
     encoded_pixels = get_encoded_pixels(loaders=loaders, runner=runner,
