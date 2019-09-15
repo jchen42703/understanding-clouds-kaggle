@@ -18,6 +18,7 @@ class CloudDataset(Dataset):
             self.data_folder = f"{path}/train_images"
         else:
             self.data_folder = f"{path}/test_images"
+        self.masks_folder = os.path.join(path, "masks") # only when use_resized_dataset=True
         self.use_resized_dataset = use_resized_dataset
         self.img_ids = im_ids
         self.transforms = transforms
@@ -25,10 +26,10 @@ class CloudDataset(Dataset):
 
     def __getitem__(self, idx):
         image_name = self.img_ids[idx]
-        if self.use_resized_dataset:
+        if not self.use_resized_dataset:
             mask = make_mask(self.df, image_name)
         else:
-            mask = make_mask_resized_dset(self.df, image_name, os.path.join(path, "masks"))
+            mask = make_mask_resized_dset(self.df, image_name, self.masks_folder)
         # loading image
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
