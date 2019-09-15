@@ -1,5 +1,6 @@
 import albumentations as albu
 import pandas as pd
+import os
 
 from clouds.io.utils import to_tensor
 
@@ -14,6 +15,7 @@ def setup_train_and_sub_df(path):
                 im_id & label
             sub (pd.DataFrame): The prepared sample submission dataframe with the
                 same extra columns as train
+            id_mask_count (pd.DataFrame): The dataframe prepared for splitting
     """
     # Reading the in the .csvs
     train = pd.read_csv(os.path.join(path, "train.csv"))
@@ -27,7 +29,7 @@ def setup_train_and_sub_df(path):
     sub['im_id'] = sub['Image_Label'].apply(lambda x: x.split('_')[0])
     id_mask_count = train.loc[train["EncodedPixels"].isnull() == False, "Image_Label"].apply(lambda x: x.split("_")[0]).value_counts().\
     reset_index().rename(columns={"index": "im_id", "Image_Label": "count"})
-    return (train, sub)
+    return (train, sub, id_mask_count)
 
 def get_training_augmentation(use_resized_dataset=False):
     train_transform = [
