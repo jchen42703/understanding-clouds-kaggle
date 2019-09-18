@@ -15,7 +15,7 @@ from clouds.io.dataset import CloudDataset
 from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, setup_train_and_sub_df
 
 def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16, encoder="resnet50",
-         test_size=0.1, use_resized_dataset=False, split_seed=42):
+         test_size=0.1, use_resized_dataset=False, split_seed=42, attention_type="scse"):
     """
     Main code for training.
     Args:
@@ -40,11 +40,13 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
     DEVICE = "cuda"
 
     ACTIVATION = None
+    attention_type = None if attention_type == "None" else attention_type
     model = smp.Unet(
         encoder_name=encoder,
         encoder_weights=ENCODER_WEIGHTS,
         classes=4,
         activation=ACTIVATION,
+        attention_type=attention_type
     )
     preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, ENCODER_WEIGHTS)
 
@@ -128,8 +130,10 @@ if __name__ == "__main__":
     add_bool_arg(parser, "use_resized_dataset", default=False)
     parser.add_argument("--split_seed", type=int, required=False, default=42,
                         help="Seed for the train/val dataset split")
+    parser.add_argument("--attention_type", type=str, required=False, default="scse",
+                        help="Attention type; if you want None, just put the string None.")
     args = parser.parse_args()
 
     main(path=args.dset_path, num_epochs=args.num_epochs, bs=args.batch_size,
          encoder=args.encoder, test_size=args.test_size, use_resized_dataset=args.use_resized_dataset,
-         split_seed=args.split_seed)
+         split_seed=args.split_seed, attention_type=args.attention_type)
