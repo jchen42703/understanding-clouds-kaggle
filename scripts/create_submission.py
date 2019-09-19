@@ -18,7 +18,7 @@ from clouds.io.utils import post_process, mask2rle, sigmoid
 from utils import get_validation_augmentation, get_preprocessing, setup_train_and_sub_df
 from clouds.inference.inference import get_encoded_pixels
 
-def main(path, bs=8, encoder="resnet34"):
+def main(path, bs=8, encoder="resnet34", attention_type="scse"):
     """
     Args:
         path (str): Path to the dataset (unzipped)
@@ -30,11 +30,13 @@ def main(path, bs=8, encoder="resnet34"):
 
     ENCODER_WEIGHTS = "imagenet"
     ACTIVATION = None
+    attention_type = None if attention_type == "None" else attention_type
     model = smp.Unet(
         encoder_name=encoder,
         encoder_weights=ENCODER_WEIGHTS,
         classes=4,
         activation=ACTIVATION,
+        attention_type=attention_type
     )
     # setting up the test I/O
     preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, ENCODER_WEIGHTS)
@@ -102,5 +104,7 @@ if __name__ == "__main__":
                         help="Batch size")
     parser.add_argument("--encoder", type=str, required=False, default="resnet50",
                         help="one of the encoders in https://github.com/qubvel/segmentation_models.pytorch")
+    parser.add_argument("--attention_type", type=str, required=False, default="scse",
+                        help="Attention type; if you want None, just put the string None.")
     args = parser.parse_args()
-    main(args.dset_path, bs=args.batch_size, encoder=args.encoder)
+    main(args.dset_path, bs=args.batch_size, encoder=args.encoder, attention_type=args.attention_type)
