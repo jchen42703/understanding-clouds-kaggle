@@ -1,6 +1,9 @@
 import albumentations as albu
 import pandas as pd
 import os
+import random
+import numpy as np
+import torch
 
 from clouds.io.utils import to_tensor
 
@@ -68,3 +71,11 @@ def get_preprocessing(preprocessing_fn):
         albu.Lambda(image=to_tensor, mask=to_tensor),
     ]
     return albu.Compose(_transform)
+
+def seed_everything(seed=42):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
