@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import pandas as pd
 import segmentation_models_pytorch as smp
+import pickle
 
 from torch.utils.data import DataLoader
 from catalyst.dl.callbacks import InferCallback, CheckpointCallback
@@ -28,18 +29,16 @@ def main(path, bs=8, encoder="resnet34", attention_type="scse"):
     torch.cuda.empty_cache()
     gc.collect()
 
-    ENCODER_WEIGHTS = "imagenet"
-    ACTIVATION = None
     attention_type = None if attention_type == "None" else attention_type
     model = smp.Unet(
         encoder_name=encoder,
-        encoder_weights=ENCODER_WEIGHTS,
+        encoder_weights=None,
         classes=4,
-        activation=ACTIVATION,
+        activation=None,
         attention_type=attention_type
     )
     # setting up the test I/O
-    preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, ENCODER_WEIGHTS)
+    preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, "imagenet")
     # setting up the train/val split with filenames
     train, sub, _ = setup_train_and_sub_df(path)
     # train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=42,
@@ -58,8 +57,17 @@ def main(path, bs=8, encoder="resnet34", attention_type="scse"):
     runner = SupervisedRunner()
     # loaders = {"valid": valid_loader, "test": test_loader}
     loaders = {"test": test_loader}
+    # loading the pickled class_params if they exist
+    class_params_path = os.path.join(path, "class_params.pickle")
+    if os.path.exists(class_params_path):
+        print(f"Loading {class_params_path}...")
+        # Load data (deserialize)
+        with open(class_params_path, "rb") as handle:
+            class_params = pickle.load(handle)
+    else:
+        class_params = "default"
 
-    create_submission(model=model, loaders=loaders, runner=runner, sub=sub)
+    create_submission(model=model, loaders=loaders, runner=runner, sub=sub, class_params=class_params)
 
 def create_submission(model, loaders, runner, sub, class_params="default"):
     """
