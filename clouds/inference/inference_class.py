@@ -29,8 +29,8 @@ class Inference(object):
         self.mode = mode
         self.loader = test_loader
         self.dataset = test_dataset
-        self.seg_class_params = {0: (0.5, 600), 1: (0.5, 600), 2: (0.5, 1000),
-                                 3: (0.5, 2000)} # (threshold, min_size)
+        self.seg_class_params = {0: (0.5, 10000), 1: (0.5, 10000), 2: (0.5, 10000),
+                                 3: (0.5, 10000)} # (threshold, min_size)
         self.tta_fn = None
         if tta_flips is not None:
             assert isinstance(tta_flips, (list, tuple)), \
