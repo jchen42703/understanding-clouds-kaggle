@@ -10,57 +10,45 @@ from catalyst.dl import utils
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR
+from pathlib import Path
 
-from clouds.io.dataset import CloudDataset
-from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, setup_train_and_sub_df
+from clouds.io import CloudDataset
+from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, setup_train_and_sub_df, seed_everything
 
-def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16, encoder="resnet50",
-         test_size=0.1, use_resized_dataset=False, split_seed=42, attention_type="scse"):
+def main(args):
     """
-    Main code for training.
+    Main code for training for training a U-Net with some user-defined encoder.
     Args:
-        path (str): Path to the dataset (unzipped)
-        num_epochs (int): number of epochs to train for
-        bs (int): batch size
-        encoder (str): one of the encoders in https://github.com/qubvel/segmentation_models.pytorch
-        use_resized_dataset (bool): Whether or not you are using the original or the pre-resized dataset
-        split_seed (int): seed for the dataset split
+        args (instance of argparse.ArgumentParser): arguments must be compiled with parse_args
+    Returns:
+        None
     """
-    # Reading the in the .csvs
-    train = pd.read_csv(f"{path}/train.csv")
-    sub = pd.read_csv(f"{path}/sample_submission.csv")
-
     # setting up the train/val split with filenames
-    train, sub, id_mask_count = setup_train_and_sub_df(path)
+    train, sub, id_mask_count = setup_train_and_sub_df(args.dset_path)
     # setting up the train/val split with filenames
-    train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=split_seed,
-                                            stratify=id_mask_count["count"], test_size=test_size)
+    seed_everything(args.split_seed)
+    train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values, random_state=args.split_seed,
+                                            stratify=id_mask_count["count"], test_size=args.test_size)
     # setting up model (U-Net with ImageNet Encoders)
     ENCODER_WEIGHTS = "imagenet"
     DEVICE = "cuda"
 
-    ACTIVATION = None
-    attention_type = None if attention_type == "None" else attention_type
-    model = smp.Unet(
-        encoder_name=encoder,
-        encoder_weights=ENCODER_WEIGHTS,
-        classes=4,
-        activation=ACTIVATION,
-        attention_type=attention_type
+    attention_type = None if args.attention_type == "None" else args.attention_type
+    model = smp.Unet(encoder_name=args.encoder, encoder_weights=ENCODER_WEIGHTS,
+                     classes=4, activation=None, attention_type=attention_type
     )
-    preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, ENCODER_WEIGHTS)
+    preprocessing_fn = smp.encoders.get_preprocessing_fn(args.encoder, ENCODER_WEIGHTS)
 
     # Setting up the I/O
-    num_workers = 0
-    train_dataset = CloudDataset(path, df=train, datatype="train", im_ids=train_ids,
-                                 transforms=get_training_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn),
-                                 use_resized_dataset=use_resized_dataset)
-    valid_dataset = CloudDataset(path, df=train, datatype="valid", im_ids=valid_ids,
-                                 transforms=get_validation_augmentation(use_resized_dataset), preprocessing=get_preprocessing(preprocessing_fn),
-                                 use_resized_dataset=use_resized_dataset)
+    train_dataset = CloudDataset(args.dset_path, df=train, datatype="train", im_ids=train_ids,
+                                 transforms=get_training_augmentation(), preprocessing=get_preprocessing(preprocessing_fn),
+                                 use_resized_dataset=args.use_resized_dataset)
+    valid_dataset = CloudDataset(args.dset_path, df=train, datatype="valid", im_ids=valid_ids,
+                                 transforms=get_validation_augmentation(), preprocessing=get_preprocessing(preprocessing_fn),
+                                 use_resized_dataset=args.use_resized_dataset)
 
-    train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True, num_workers=num_workers)
-    valid_loader = DataLoader(valid_dataset, batch_size=bs, shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     loaders = {
         "train": train_loader,
@@ -71,12 +59,20 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
 
     # model, criterion, optimizer
     optimizer = torch.optim.Adam([
-        {"params": model.decoder.parameters(), "lr": 1e-2},
-        {"params": model.encoder.parameters(), "lr": 1e-3},
+        {"params": model.decoder.parameters(), "lr": args.encoder_lr},
+        {"params": model.encoder.parameters(), "lr": args.decoder_lr},
     ])
     scheduler = ReduceLROnPlateau(optimizer, factor=0.15, patience=2)
     criterion = smp.utils.losses.BCEDiceLoss(eps=1.)
     runner = SupervisedRunner()
+
+    callbacks_list = [DiceCallback(), EarlyStoppingCallback(patience=5, min_delta=0.001),]
+    if args.checkpoint_path != "None": # hacky way to say no checkpoint callback but eh what the heck
+        ckpoint_p = Path(args.checkpoint_path)
+        fname = ckpoint_p.name
+        resume_dir = str(ckpoint_p.parents[0]) # everything in the path besides the base file name
+        print(f"Loading {fname} from {resume_dir}. Checkpoints will also be saved in {resume_dir}.")
+        callbacks_list = callbacks_list + [CheckpointCallback(resume=fname, resume_dir=resume_dir),]
 
     runner.train(
         model=model,
@@ -84,15 +80,10 @@ def main(path="../input/understanding_cloud_organization", num_epochs=21, bs=16,
         optimizer=optimizer,
         scheduler=scheduler,
         loaders=loaders,
-        callbacks=[DiceCallback(), EarlyStoppingCallback(patience=5, min_delta=0.001)],
+        callbacks=callbacks_list,
         logdir=logdir,
-        num_epochs=num_epochs,
+        num_epochs=args.num_epochs,
         verbose=True
-    )
-    utils.plot_metrics(
-        logdir=logdir,
-        # specify which metrics we want to plot
-        metrics=["loss", "dice", "lr", "_base/lr"]
     )
 
 def add_bool_arg(parser, name, default=False):
@@ -123,6 +114,10 @@ if __name__ == "__main__":
                         help="Number of epochs")
     parser.add_argument("--batch_size", type=int, required=False, default=16,
                         help="Batch size")
+    parser.add_argument("--encoder_lr", type=float, required=False, default=0.00001,
+                        help="Learning rate for the encoder.")
+    parser.add_argument("--decoder_lr", type=float, required=False, default=0.001,
+                        help="Learning rate for the decoder.")
     parser.add_argument("--encoder", type=str, required=False, default="resnet50",
                         help="one of the encoders in https://github.com/qubvel/segmentation_models.pytorch")
     parser.add_argument("--test_size", type=float, required=False, default=0.1,
@@ -130,10 +125,12 @@ if __name__ == "__main__":
     add_bool_arg(parser, "use_resized_dataset", default=False)
     parser.add_argument("--split_seed", type=int, required=False, default=42,
                         help="Seed for the train/val dataset split")
+    parser.add_argument("--num_workers", type=int, required=False, default=2,
+                        help="Number of workers for data loaders.")
     parser.add_argument("--attention_type", type=str, required=False, default="scse",
                         help="Attention type; if you want None, just put the string None.")
+    parser.add_argument("--checkpoint_path", type=str, required=False, default="None",
+                        help="Checkpoint path; if you want to train from scratch, just put the string as None.")
     args = parser.parse_args()
 
-    main(path=args.dset_path, num_epochs=args.num_epochs, bs=args.batch_size,
-         encoder=args.encoder, test_size=args.test_size, use_resized_dataset=args.use_resized_dataset,
-         split_seed=args.split_seed, attention_type=args.attention_type)
+    main(args)
