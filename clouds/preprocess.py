@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 from clouds.io.utils import rle_decode, make_mask
 
 COLAB_PATHS_DICT = {
-    "train_dir": "./train_images/"
-    "test_dir": "./test_images/"
-    "train_out": "train640.zip"
-    "test_out": "test640.zip"
-    "mask_out": "masks640.zip"
+    "train_dir": "./train_images/",
+    "test_dir": "./test_images/",
+    "train_out": "train640.zip",
+    "test_out": "test640.zip",
+    "mask_out": "masks640.zip",
 }
 
 class Preprocessor(object):
