@@ -38,17 +38,23 @@ def get_training_augmentation(augmentation_key="aug5"):
     transform_dict = {
                       "aug1": [
                                 albu.HorizontalFlip(p=0.5),
-                                albu.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=0.5, border_mode=0),
+                                albu.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0,
+                                                      shift_limit=0.1, p=0.5,
+                                                      border_mode=0),
                                 albu.GridDistortion(p=0.5),
                                 albu.OpticalDistortion(p=0.5, distort_limit=2, shift_limit=0.5),
 	                          ],
                       "aug2": [
                                 albu.HorizontalFlip(p=0.5),
                                 albu.VerticalFlip(p=0.5),
-                                albu.ShiftScaleRotate(scale_limit=0.1, rotate_limit=0, shift_limit=0.5, p=0.5, border_mode=0),
+                                albu.ShiftScaleRotate(scale_limit=0.1, rotate_limit=0,
+                                                      shift_limit=0.5, p=0.5,
+                                                      border_mode=0),
                                 albu.OneOf([
-                                            albu.RandomResizedCrop(height=256, width=1600, scale=(1.0, 0.9), ratio=(0.75, 1.33)),
-                                            albu.RandomCrop(height=256, width=1600)
+                                            albu.RandomResizedCrop(height=320, width=640,
+                                                                   scale=(1.0, 0.9),
+                                                                   ratio=(0.75, 1.33)),
+                                            albu.RandomCrop(height=320, width=640)
                                            ], p=0.3),
                                 albu.Lambda(image=do_random_log_contrast, p=0.5),
                                 albu.Lambda(image=do_noise, p=0.5),
