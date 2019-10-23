@@ -52,8 +52,7 @@ def main(args):
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size,
                              shuffle=False, num_workers=0)
     infer = Inference(args.checkpoint_paths, test_loader, test_dataset,
-                      models=models, mode=args.mode, tta_flips=args.tta,
-                      sharpen_t=args.sharpen_t)
+                      models=models, mode=args.mode, tta_flips=args.tta)
     out_df = infer.create_sub(sub=sub)
 
 if __name__ == "__main__":

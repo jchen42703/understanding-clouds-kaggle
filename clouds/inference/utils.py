@@ -97,13 +97,7 @@ def lrud_flip(x):
     """
     return ud_flip(lr_flip(x))
 
-def sharpen(p,t=0.5):
-        if t!=0:
-            return p**t
-        else:
-            return p
-
-def apply_nonlin(logit, non_lin="sigmoid", sharpen_t=0.5):
+def apply_nonlin(logit, non_lin="sigmoid"):
     """
     Applies non-linearity and sharpens if it's sigmoid.
 
@@ -111,7 +105,6 @@ def apply_nonlin(logit, non_lin="sigmoid", sharpen_t=0.5):
         logit (torch.Tensor): output logits from a model
             shape: (batch_size, n_classes, h, w) or (batch_size, n_classes)
         non_lin (str): one of [None, 'sigmoid', 'softmax']
-        sharpen_t (float): sharpen exponent for the output probabilities
     Returns:
         x: torch.Tensor, same shape as logit
     """
@@ -119,7 +112,6 @@ def apply_nonlin(logit, non_lin="sigmoid", sharpen_t=0.5):
         return logit
     elif non_lin == "sigmoid":
         x = torch.sigmoid(logit)
-        x = sharpen(x, sharpen_t)
         return x
     elif non_lin == "softmax":
         # softmax across the channels dim
@@ -151,7 +143,7 @@ def tta_one(model, batch, mode, results_arr, num_results, post_process_fn, tta_f
     return results_arr
 
 def tta_flips_fn(model, batch, mode="segmentation", flips=["lr_flip",],
-                 non_lin="sigmoid", sharpen_t=0.5):
+                 non_lin="sigmoid"):
     """
     Inspired by: https://github.com/MIC-DKFZ/nnUNet/blob/2228cbe9e77910aaf97040790af83b8984ab9c11/nnunet/network_architecture/neural_network.py
     Applies flip TTA with cuda.
@@ -163,24 +155,22 @@ def tta_flips_fn(model, batch, mode="segmentation", flips=["lr_flip",],
         flips (list-like): consisting one of or all of ["lr_flip", "ud_flip", "lrud_flip"].
             Defaults to ["lr_flip", "ud_flip", "lrud_flip"].
         non_lin (str): Either sigmoid or softmax
-        sharpen_t (float): Parameter to sharpen with
     Returns:
         averaged probability predictions
     """
     process = partial(apply_nonlin, non_lin=non_lin)
-    process_tta = partial(process, sharpen_t=sharpen_t)
     with torch.no_grad():
         batch_size = batch.shape[0]
         spatial_dims = list(batch.shape[2:]) if mode=="segmentation" else []
         results = torch.zeros([batch_size, 4] + spatial_dims, dtype=torch.float).cuda()
 
         num_results = 1 + len(flips)
-        pred = process(model(batch.cuda()), sharpen_t=0).squeeze()
+        pred = process(model(batch.cuda())).squeeze()
         results += 1/num_results * pred
         # applying tta
         tta_fn_list = [globals()[fn] for fn in flips]
         for tta_fn in tta_fn_list:
             results = tta_one(model, batch, mode, results, num_results,
-                              post_process_fn=process_tta,
+                              post_process_fn=process,
                               tta_fn=tta_fn)
     return results
