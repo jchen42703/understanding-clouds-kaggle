@@ -53,7 +53,7 @@ def main(args):
                                                transforms=get_training_augmentation(args.aug_key),
                                                preprocessing=get_preprocessing(preprocessing_fn))
     valid_dataset = ClassificationCloudDataset(args.dset_path, df=train, datatype="valid", im_ids=valid_ids,
-                                               transforms=get_validation_augmentation(),
+                                               transforms=get_validation_augmentation(args.aug_key),
                                                preprocessing=get_preprocessing(preprocessing_fn))
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size,

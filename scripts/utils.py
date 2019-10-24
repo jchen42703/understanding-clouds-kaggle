@@ -73,10 +73,14 @@ def get_training_augmentation(augmentation_key="aug5"):
     train_transform = transform_dict[augmentation_key]
     return albu.Compose(train_transform)
 
-def get_validation_augmentation():
+def get_validation_augmentation(augmentation_key):
     """Add paddings to make image shape divisible by 32"""
-    test_transform = [
-    ]
+    transform_dict = {
+                      "aug1": [],
+                      "aug2": [],
+                      "aug3": [albu.RandomCrop(height=320, width=640, p=1)],
+                     }
+    test_transform = transform_dict[augmentation_key]
     return albu.Compose(test_transform)
 
 def get_preprocessing(preprocessing_fn):
