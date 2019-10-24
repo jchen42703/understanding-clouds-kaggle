@@ -13,7 +13,7 @@ from clouds.inference.utils import mask2rle, post_process, load_weights_infer, \
 
 class Inference(object):
     def __init__(self, checkpoint_paths, test_loader, test_dataset, models=None,
-                 mode="segmentation", tta_flips=None, sharpen_t=0.5):
+                 mode="segmentation", tta_flips=None):
         """
         Attributes:
             checkpoint_paths (List[str]): Path to a checkpoint
@@ -22,7 +22,6 @@ class Inference(object):
             mode (str): either "segmentation" or "classification". Defaults to "segmentation"
             tta_flips (list-like): consisting one of or all of ["lr_flip", "ud_flip", "lrud_flip"].
                 Defaults to None.
-            sharpen_t (float): Parameter to sharpen with
         """
         self.load_checkpoints(checkpoint_paths, models)
 
@@ -37,8 +36,7 @@ class Inference(object):
                 "tta_flips must be a list-like of strings."
             print(f"TTA Ops: {tta_flips}")
             self.tta_fn = partial(tta_flips_fn, model=self.model, mode=mode,
-                                  flips=tta_flips, non_lin="sigmoid",
-                                  sharpen_t=sharpen_t)
+                                  flips=tta_flips, non_lin="sigmoid")
 
     def load_checkpoints(self, checkpoint_paths, models):
         """
@@ -103,7 +101,7 @@ class Inference(object):
             if self.tta_fn is not None:
                 pred_out = self.tta_fn(batch=test_batch[0].cuda())
             else:
-                pred_out = apply_nonlin(self.model(test_batch[0].cuda()), sharpen_t=0)
+                pred_out = apply_nonlin(self.model(test_batch[0].cuda()))
             # for each batch (4, h, w): resize and post_process
             for i, batch in enumerate(pred_out):
                 for probability in batch:
@@ -135,7 +133,7 @@ class Inference(object):
             if self.tta_fn is not None:
                 pred_out = self.tta_fn(batch=test_batch[0].cuda())
             else:
-                pred_out = apply_nonlin(self.model(test_batch[0].cuda()), sharpen_t=0)
+                pred_out = apply_nonlin(self.model(test_batch[0].cuda()))
             # for each batch (n, 4): post process
             for i, batch in enumerate(pred_out):
                 # iterating through each prediction (4,)
