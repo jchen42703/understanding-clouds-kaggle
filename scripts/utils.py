@@ -77,7 +77,18 @@ def get_training_augmentation(augmentation_key="aug5"):
                                                       border_mode=0),
                                 albu.RandomCrop(height=320, width=320, p=1),
                                 albu.Lambda(image=do_noise, p=0.5),
-                              ]
+                              ],
+                      "aug5": [
+                                albu.HorizontalFlip(p=0.5),
+                                albu.VerticalFlip(p=0.5),
+                                albu.ShiftScaleRotate(scale_limit=0.1, rotate_limit=0,
+                                                      shift_limit=0.5, p=0.5,
+                                                      border_mode=0),
+                                albu.RandomCrop(height=320, width=320, p=1),
+                                albu.Lambda(image=do_noise, p=0.5),
+                                albu.GridDistortion(p=0.5),
+                                albu.OpticalDistortion(p=0.5, distort_limit=2, shift_limit=0.5),
+                              ],
                      }
     train_transform = transform_dict[augmentation_key]
     return albu.Compose(train_transform)
@@ -89,6 +100,7 @@ def get_validation_augmentation(augmentation_key):
                       "aug2": [],
                       "aug3": [albu.RandomCrop(height=320, width=640, p=1)],
                       "aug4": [albu.RandomCrop(height=320, width=320, p=1)],
+                      "aug5": [albu.RandomCrop(height=320, width=320, p=1)],                      
                      }
     test_transform = transform_dict[augmentation_key]
     return albu.Compose(test_transform)
