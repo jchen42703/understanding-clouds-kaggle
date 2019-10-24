@@ -68,6 +68,15 @@ def get_training_augmentation(augmentation_key="aug5"):
                                 albu.RandomCrop(height=320, width=640, p=1),
                                 albu.Lambda(image=do_random_log_contrast, p=0.5),
                                 albu.Lambda(image=do_noise, p=0.5),
+                              ],
+                      "aug4": [
+                                albu.HorizontalFlip(p=0.5),
+                                albu.VerticalFlip(p=0.5),
+                                albu.ShiftScaleRotate(scale_limit=0.1, rotate_limit=0,
+                                                      shift_limit=0.5, p=0.5,
+                                                      border_mode=0),
+                                albu.RandomCrop(height=320, width=320, p=1),
+                                albu.Lambda(image=do_noise, p=0.5),
                               ]
                      }
     train_transform = transform_dict[augmentation_key]
