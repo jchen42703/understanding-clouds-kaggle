@@ -9,12 +9,14 @@ from catalyst.dl.runner import SupervisedRunner
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, \
+                                     CosineAnnealingWarmRestarts, CyclicLR
 
 from clouds.models import Pretrained
 from clouds.io import ClassificationCloudDataset
 from clouds.custom.ppv_tpr_f1 import PrecisionRecallF1ScoreCallback
-from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, setup_train_and_sub_df, seed_everything
+from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, \
+                  setup_train_and_sub_df, seed_everything
 
 def main(args):
     """
@@ -74,7 +76,17 @@ def main(args):
     elif args.opt.lower() == "sgd":
         optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), \
                                     lr=args.lr, momentum=0.9, weight_decay=0.0001)
-    scheduler = ReduceLROnPlateau(optimizer, factor=0.15, patience=2)
+
+    if args.scheduler.lower() == "plateau":
+        scheduler = ReduceLROnPlateau(optimizer, factor=0.15, patience=2)
+    elif args.scheduler.lower() == "cosineannealing":
+        scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs)
+    elif args.scheduler.lower() == "cosineannealingwr":
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=7, T_mult=2)
+    elif args.scheduler.lower() == "clr":
+        num_steps = len(train_dataset)
+        scheduler = CyclicLR(optimizer, base_lr=args.lr/10, max_lr=args.lr,
+                             steps_size_up=num_steps*2, mode="exp_range")
 
     if args.loss == "bce_dice_loss":
         criterion = smp.utils.losses.BCEDiceLoss(eps=1.)
@@ -155,6 +167,9 @@ if __name__ == "__main__":
                         help="Either bce_dice_loss or bce")
     parser.add_argument("--lr", type=float, required=False, default=3e-4,
                         help="Learning rate.")
+    parser.add_argument("--scheduler", type=str, required=False, default="plateau",
+                        help="Learning rate scheduler; one of 'clr', \
+                        'plateau', 'cosineannealing', or 'cosineannealingwr'.")
     parser.add_argument("--checkpoint_path", type=str, required=False, default="None",
                         help="Checkpoint path; if you want to train from scratch, just put the string as None.")
     parser.add_argument("--checkpoint_mode", type=str, required=False, default="full",
