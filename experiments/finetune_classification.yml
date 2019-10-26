@@ -1,4 +1,5 @@
   dset_path: /content/
+  logdir: /content/logs/segmentation/
 
   io_params:
     df_setup_type: regular
