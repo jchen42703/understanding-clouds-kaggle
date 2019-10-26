@@ -1,6 +1,6 @@
 from catalyst.dl.runner import SupervisedRunner
 
-from utils import setup_train_and_sub_df, seed_everything
+from utils import seed_everything
 from experiment import TrainClassificationExperimentFromConfig
 
 def main(config):
@@ -14,10 +14,8 @@ def main(config):
         None
     """
     # setting up the train/val split with filenames
-    train, sub, id_mask_count = setup_train_and_sub_df(config["dset_path"])
-    # setting up the train/val split with filenames
     seed_everything(config["io_params"]["split_seed"])
-    exp = TrainClassificationExperimentFromConfig(config, train, id_mask_count)
+    exp = TrainClassificationExperimentFromConfig(config)
     runner = SupervisedRunner()
 
     runner.train(
