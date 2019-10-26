@@ -10,16 +10,28 @@ from torch.utils.data import Dataset
 from .utils import make_mask, make_mask_resized_dset, get_classification_label
 
 class CloudDataset(Dataset):
-    def __init__(self, path: str, df: pd.DataFrame=None, datatype: str="train", im_ids: np.array=None,
+    def __init__(self, data_folder: str, df: pd.DataFrame, im_ids: np.array,
+                 masks_folder: str=None,
                  transforms=albu.Compose([albu.HorizontalFlip(), AT.ToTensor()]),
-                 preprocessing=None, use_resized_dataset=False):
+                 preprocessing=None):
+        """
+        Attributes
+            data_folder (str): path to the image directory
+            df (pd.DataFrame): dataframe with the labels
+            im_ids (np.ndarray): of image names.
+            masks_folder (str): path to the masks directory
+                assumes `use_resized_dataset == True`
+            transforms (albumentations.augmentation): transforms to apply
+                before preprocessing. Defaults to HFlip and ToTensor
+            preprocessing: ops to perform after transforms, such as
+                z-score standardization. Defaults to None.
+        """
         self.df = df
-        if datatype != "test":
-            self.data_folder = os.path.join(path, "train_images")
-        else:
-            self.data_folder = os.path.join(path, "test_images")
-        self.masks_folder = os.path.join(path, "masks") # only when use_resized_dataset=True
-        self.use_resized_dataset = use_resized_dataset
+        self.data_folder = data_folder
+        self.masks_folder = masks_folder
+        if isinstance(masks_folder, str):
+            self.use_resized_dataset = True
+            print(f"Using resized masks in {masks_folder}...")
         self.img_ids = im_ids
         self.transforms = transforms
         self.preprocessing = preprocessing
@@ -29,7 +41,8 @@ class CloudDataset(Dataset):
         if not self.use_resized_dataset:
             mask = make_mask(self.df, image_name)
         else:
-            mask = make_mask_resized_dset(self.df, image_name, self.masks_folder)
+            mask = make_mask_resized_dset(self.df, image_name,
+                                          self.masks_folder)
         # loading image
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
@@ -48,15 +61,22 @@ class CloudDataset(Dataset):
         return len(self.img_ids)
 
 class ClassificationCloudDataset(Dataset):
-    def __init__(self, path: str, df: pd.DataFrame=None, datatype: str="train", im_ids: np.array=None,
+    def __init__(self, data_folder: str, df: pd.DataFrame, im_ids: np.array,
                  transforms=albu.Compose([albu.HorizontalFlip(), AT.ToTensor()]),
                  preprocessing=None):
+        """
+        Attributes
+            data_folder (str): path to the image directory
+            df (pd.DataFrame): dataframe with the labels
+            im_ids (np.ndarray): of image names.
+            transforms (albumentations.augmentation): transforms to apply
+                before preprocessing. Defaults to HFlip and ToTensor
+            preprocessing: ops to perform after transforms, such as
+                z-score standardization. Defaults to None.
+        """
         df["hasMask"] = ~ df["EncodedPixels"].isna()
         self.df = df
-        if datatype != "test":
-            self.data_folder = os.path.join(path, "train_images")
-        else:
-            self.data_folder = os.path.join(path, "test_images")
+        self.data_folder = data_folder
         self.img_ids = im_ids
         self.transforms = transforms
         self.preprocessing = preprocessing
