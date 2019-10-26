@@ -23,18 +23,18 @@ def main(config):
     runner.train(
         model=exp.model,
         criterion=exp.criterion,
-        optimizer=exp.optimizer,
-        scheduler=exp.scheduler,
+        optimizer=exp.opt,
+        scheduler=exp.lr_scheduler,
         loaders=exp.loaders,
-        callbacks=callbacks_list,
-        logdir=logdir,
-        num_epochs=args.num_epochs,
+        callbacks=exp.cb_list,
+        logdir=config["logdir"],
+        num_epochs=config["num_epochs"],
         verbose=True
     )
 
 if __name__ == "__main__":
     import yaml
-    import argparser
+    import argparse
 
     parser = argparse.ArgumentParser(description="For training.")
     parser.add_argument("--yml_path", type=str, required=True,
