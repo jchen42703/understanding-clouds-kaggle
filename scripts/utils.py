@@ -7,11 +7,12 @@ import torch
 
 from clouds.io.utils import to_tensor
 
-def setup_train_and_sub_df(path):
+def setup_train_and_sub_df(train_csv_path, sample_sub_csv_path):
     """
     Sets up the training and sample submission DataFrame.
     Args:
-        path (str): Base diretory where train.csv and sample_submission.csv are located
+        train_csv_path (str): path to 'train.csv'
+        sample_sub_csv_path (str): path to `sample_submission.csv`
     Returns:
         tuple of:
             train (pd.DataFrame): The prepared training dataframe with the extra columns:
@@ -21,8 +22,8 @@ def setup_train_and_sub_df(path):
             id_mask_count (pd.DataFrame): The dataframe prepared for splitting
     """
     # Reading the in the .csvs
-    train = pd.read_csv(os.path.join(path, "train.csv"))
-    sub = pd.read_csv(os.path.join(path, "sample_submission.csv"))
+    train = pd.read_csv(train_csv_path)
+    sub = pd.read_csv(sample_sub_csv_path)
 
     # setting the dataframe for training/inference
     train["label"] = train["Image_Label"].apply(lambda x: x.split("_")[1])
@@ -100,7 +101,7 @@ def get_validation_augmentation(augmentation_key):
                       "aug2": [],
                       "aug3": [albu.RandomCrop(height=320, width=640, p=1)],
                       "aug4": [albu.RandomCrop(height=320, width=320, p=1)],
-                      "aug5": [albu.RandomCrop(height=320, width=320, p=1)],                      
+                      "aug5": [albu.RandomCrop(height=320, width=320, p=1)],
                      }
     test_transform = transform_dict[augmentation_key]
     return albu.Compose(test_transform)
