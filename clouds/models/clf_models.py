@@ -14,8 +14,12 @@ class Pretrained(nn.Module):
         if not pretrained:
             params['pretrained'] = None
         model = pretrainedmodels.__dict__[variant](**params)
+
         if "se_res" in variant:
             model.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+        if variant == "inceptionresnetv2":
+            model.avgpool_1a = nn.AdaptiveAvgPool2d((1, 1))
 
         self.need_refactor = False
         if 'resnet' in variant:
