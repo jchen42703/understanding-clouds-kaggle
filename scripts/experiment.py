@@ -3,6 +3,7 @@ import torch
 import segmentation_models_pytorch as smp
 import pandas as pd
 
+from abc import abstractmethod
 from pathlib import Path
 from catalyst.dl.callbacks import AccuracyCallback, EarlyStoppingCallback, \
                                   CheckpointCallback
@@ -19,27 +20,49 @@ from clouds.custom.ppv_tpr_f1 import PrecisionRecallF1ScoreCallback
 from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, \
                   setup_train_and_sub_df, seed_everything
 
-class TrainClassificationExperimentFromConfig(object):
-    """
-    Stores the main parts of an experiment:
-    - df split
-    - loaders
-    - model
-    - optimizer
-    - lr_scheduler
-    - criterion
-    """
-    def __init__(self, config: dict, df: pd.DataFrame, id_mask_count=None):
+class TrainExperiment(object):
+    def __init__(self, config: dict):
         """
-        Attributes:
+        Args:
             config (dict): from `train_classification_yaml.py`
-            df (pd.DataFrame): train_df from `setup_train_and_sub_df(config['dset_path'])`
-                The prepared training dataframe with the extra columns:
-                    - im_id & label
-            id_mask_count (pd.DataFrame): id_mask_count from
-                `setup_train_and_sub_df(config['dset_path'])`
-                Different from `df` b/c only has ids that contain a mask.
-                Defaults to None.
+
+        Attributes:
+            config-related:
+                config (dict): from `train_classification_yaml.py`
+                io_params (dict): contains io-related parameters
+                    image_folder (key: str): path to the image folder
+                    df_setup_type (key: str): regular or pos_only
+                    test_size (key: float): split size for test
+                    split_seed (key: int): seed
+                    batch_size (key: int): <-
+                    num_workers (key: int): # of workers for data loaders
+                    aug_key (key: str): One of the augmentation keys for
+                        `get_training_augmentation` and `get_validation_augmentation`
+                        in `scripts/utils.py`
+                opt_params (dict): optimizer related parameters
+                    lr (key: str): learning rate
+                    opt (key: str): optimizer name
+                        Currently, only supports sgd and adam.
+                    scheduler_params (key: str): dict of:
+                        scheduler (key: str): scheduler name
+                        {scheduler} (key: dict): args for the above scheduler
+                cb_params (dict):
+                    earlystop (key: str):
+                        dict -> kwargs for EarlyStoppingCallback
+                    accuracy (key: str):
+                        dict -> kwargs for AccuracyCallback
+                    checkpoint_params (key: dict):
+                      checkpoint_path (key: str): path to the checkpoint
+                      checkpoint_mode (key: str): model_only or
+                        full (for stateful loading)
+            split_dict (dict): train_ids and valid_ids
+            train_dset, val_dset: <-
+            loaders (dict): train/validation loaders
+            model (torch.nn.Module): <-
+            opt (torch.optim.Optimizer): <-
+            lr_scheduler (torch.optim.lr_scheduler): <-
+            criterion (torch.nn.Module): <-
+            cb_list (list): list of catalyst callbacks
         """
         # for reuse
         self.config = config
@@ -47,102 +70,109 @@ class TrainClassificationExperimentFromConfig(object):
         self.opt_params = config["opt_params"]
         self.cb_params = config["callback_params"]
         # initializing the experiment components
-        split_dict = self.get_split(df, id_mask_count)
-        self.loaders = self.get_loaders(df, **split_dict)
+        self.df, _, self.id_mask_count = self.setup_df()
+        train_ids, val_ids = self.get_split()
+        self.train_dset, self.val_dset = self.get_datasets(train_ids, val_ids)
+        self.loaders = self.get_loaders()
         self.model = self.get_model()
-        self.opt = self.get_opt(self.model)
-        self.lr_scheduler = self.get_lr_scheduler(self.opt)
+        self.opt = self.get_opt()
+        self.lr_scheduler = self.get_lr_scheduler()
         self.criterion = self.get_criterion()
-        self.cb_list = self.get_callbacks(self.model)
+        self.cb_list = self.get_callbacks()
 
-    def get_split(self, train_df, id_mask_count=None):
+    @abstractmethod
+    def get_datasets(self, train_ids, valid_ids):
+        """
+        Initializes the data augmentation and preprocessing transforms. Creates
+        and returns the train and validation datasets.
+        """
+        return
+
+    @abstractmethod
+    def get_model(self):
+        """
+        Creates and returns the model.
+        """
+        return
+
+    def setup_df(self):
+        """
+        Setting up the dataframe to have the `im_id` & `label` columns;
+            im_id: the base img name
+            label: the label name
+        """
+        train_csv_path = self.config["train_csv_path"]
+        sample_sub_csv_path = self.config["sample_sub_csv_path"]
+        return setup_train_and_sub_df(train_csv_path, sample_sub_csv_path)
+
+    def get_split(self):
+        """
+        Creates train/valid filename splits
+        """
         # setting up the train/val split with filenames
         df_setup_type = self.io_params["df_setup_type"].lower()
         split_seed: int = self.io_params["split_seed"]
         test_size: float = self.io_params["test_size"]
-
+        # doing the splits
         if df_setup_type == "pos_only":
-            print("Setting up df with pos only ids...")
-            train_ids, valid_ids = train_test_split(id_mask_count["im_id"].values,
+            print("Splitting the df with pos only ids...")
+            assert id_mask_count is not None
+            train_ids, valid_ids = train_test_split(self.id_mask_count["im_id"].values,
                                                     random_state=split_seed,
                                                     stratify=id_mask_count["count"],
                                                     test_size=test_size)
         elif df_setup_type == "regular":
-            print("Setting up df normally...")
-            train_ids, valid_ids = train_test_split(train_df["im_id"].drop_duplicates().values,
+            print("Splitting the df normally...")
+            train_ids, valid_ids = train_test_split(self.df["im_id"].drop_duplicates().values,
                                                     random_state=split_seed,
                                                     test_size=test_size)
-        return {"train_ids": train_ids, "valid_ids": valid_ids}
+        return (train_ids, valid_ids)
 
-    def get_loaders(self, train_df, train_ids, valid_ids):
+    def get_loaders(self):
         """
-        Creates train/val datasets and loaders. Returns the loaders.
+        Creates train/val loaders from datasets created in self.get_datasets.
+        Returns the loaders.
         """
-        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.config["model_name"],
-                                                             "imagenet")
-        preprocessing_transform = get_preprocessing(preprocessing_fn)
-        train_aug = get_training_augmentation(self.io_params["aug_key"])
-        val_aug = get_validation_augmentation(self.io_params["aug_key"])
-        # Setting up the datasets
-        train_dataset = ClassificationCloudDataset(self.config["image_folder"],
-                                                   df=train_df,
-                                                   im_ids=train_ids,
-                                                   transforms=train_aug,
-                                                   preprocessing=preprocessing_transform)
-        valid_dataset = ClassificationCloudDataset(self.config["image_folder"],
-                                                   df=train_df,
-                                                   im_ids=valid_ids,
-                                                   transforms=val_aug,
-                                                   preprocessing=preprocessing_transform)
         # setting up the loaders
         b_size, num_workers = self.io_params["batch_size"], self.io_params["num_workers"]
-        train_loader = DataLoader(train_dataset, batch_size=b_size,
+        train_loader = DataLoader(self.train_dset, batch_size=b_size,
                                   shuffle=True, num_workers=num_workers)
-        valid_loader = DataLoader(valid_dataset, batch_size=b_size,
+        valid_loader = DataLoader(self.val_dset, batch_size=b_size,
                                   shuffle=False, num_workers=num_workers)
 
-        self.train_steps = len(train_dataset) # for schedulers
-        loaders = {
-            "train": train_loader,
-            "valid": valid_loader
-        }
-        return loaders
+        self.train_steps = len(self.train_dset) # for schedulers
+        return {"train": train_loader, "valid": valid_loader}
 
-    def get_model(self):
-        # setting up the classification model
-        model = Pretrained(variant=self.config["model_name"], num_classes=4,
-                           pretrained=True, activation=None)
-        return model
-
-    def get_opt(self, model):
-        assert isinstance(model, torch.nn.Module), \
+    def get_opt(self):
+        assert isinstance(self.model, torch.nn.Module), \
             "`model` must be an instance of torch.nn.Module`"
         # fetching optimizers
         lr = self.opt_params["lr"]
         opt_name = self.opt_params["opt"].lower()
         if opt_name == "adam":
-            opt = torch.optim.Adam(model.parameters(), lr=lr)
+            opt = torch.optim.Adam(self.model.parameters(), lr=lr)
         elif opt_name == "sgd":
-            opt = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), \
+            opt = torch.optim.SGD(filter(lambda p: p.requires_grad,
+                                  self.model.parameters()),
                                   lr=lr, momentum=0.9, weight_decay=0.0001)
         return opt
 
-    def get_lr_scheduler(self, optimizer):
-        assert isinstance(optimizer, torch.optim.Optimizer), \
+    def get_lr_scheduler(self):
+        assert isinstance(self.opt, torch.optim.Optimizer), \
             "`optimizer` must be an instance of torch.optim.Optimizer"
         sched_params = self.opt_params["scheduler_params"]
         scheduler_name = sched_params["scheduler"].lower()
         scheduler_args = sched_params[scheduler_name]
         # fetching lr schedulers
         if scheduler_name == "plateau":
-            scheduler = ReduceLROnPlateau(optimizer, **scheduler_args)
+            scheduler = ReduceLROnPlateau(self.opt, **scheduler_args)
         elif scheduler_name == "cosineannealing":
-            scheduler = CosineAnnealingLR(optimizer, **scheduler_args)
+            scheduler = CosineAnnealingLR(self.opt, **scheduler_args)
         elif scheduler_name == "cosineannealingwr":
-            scheduler = CosineAnnealingWarmRestarts(optimizer,
+            scheduler = CosineAnnealingWarmRestarts(self.opt,
                                                     **scheduler_args)
         elif scheduler_name == "clr":
-            scheduler = CyclicLR(optimizer, **scheduler_args)
+            scheduler = CyclicLR(self.opt, **scheduler_args)
         print(f"LR Scheduler: {scheduler}")
 
         return scheduler
@@ -157,7 +187,7 @@ class TrainClassificationExperimentFromConfig(object):
 
         return criterion
 
-    def get_callbacks(self, model=None):
+    def get_callbacks(self):
         callbacks_list = [PrecisionRecallF1ScoreCallback(num_classes=4),#DiceCallback(),
                           EarlyStoppingCallback(**self.cb_params["earlystop"]),
                           AccuracyCallback(**self.cb_params["accuracy"]),
@@ -178,8 +208,56 @@ class TrainClassificationExperimentFromConfig(object):
                                                                       resume_dir=resume_dir),]
             elif mode == "model_only":
                 print("Loading weights into model...")
-                model = load_weights_train(ckpoint_params["checkpoint_path"], model)
+                self.model = load_weights_train(ckpoint_params["checkpoint_path"], self.model)
         return callbacks_list
+
+class TrainClassificationExperimentFromConfig(TrainExperiment):
+    """
+    Stores the main parts of a classification experiment:
+    - df split
+    - datasets
+    - loaders
+    - model
+    - optimizer
+    - lr_scheduler
+    - criterion
+    - callbacks
+    """
+    def __init__(self, config: dict):
+        """
+        Args:
+            config (dict): from `train_classification_yaml.py`
+        """
+        super().__init__(config=config)
+
+    def get_datasets(self, train_ids, valid_ids):
+        """
+        Creates and returns the train and validation datasets.
+        """
+        # preparing transforms
+        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.config["model_name"],
+                                                             "imagenet")
+        preprocessing_transform = get_preprocessing(preprocessing_fn)
+        train_aug = get_training_augmentation(self.io_params["aug_key"])
+        val_aug = get_validation_augmentation(self.io_params["aug_key"])
+        # creating the datasets
+        train_dataset = ClassificationCloudDataset(self.io_params["image_folder"],
+                                                   df=self.df,
+                                                   im_ids=train_ids,
+                                                   transforms=train_aug,
+                                                   preprocessing=preprocessing_transform)
+        valid_dataset = ClassificationCloudDataset(self.io_params["image_folder"],
+                                                   df=self.df,
+                                                   im_ids=valid_ids,
+                                                   transforms=val_aug,
+                                                   preprocessing=preprocessing_transform)
+        return (train_dataset, valid_dataset)
+
+    def get_model(self):
+        # setting up the classification model
+        model = Pretrained(variant=self.config["model_name"], num_classes=4,
+                           pretrained=True, activation=None)
+        return model
 
 def load_weights_train(checkpoint_path, model):
     """
