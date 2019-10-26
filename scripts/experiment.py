@@ -37,7 +37,7 @@ class TrainClassificationExperimentFromConfig(object):
                 The prepared training dataframe with the extra columns:
                     - im_id & label
             id_mask_count (pd.DataFrame): id_mask_count from
-                `setup_train_and_sub_df(args.dset_path)`
+                `setup_train_and_sub_df(config['dset_path'])`
                 Different from `df` b/c only has ids that contain a mask.
                 Defaults to None.
         """
@@ -84,15 +84,13 @@ class TrainClassificationExperimentFromConfig(object):
         train_aug = get_training_augmentation(self.io_params["aug_key"])
         val_aug = get_validation_augmentation(self.io_params["aug_key"])
         # Setting up the datasets
-        train_dataset = ClassificationCloudDataset(self.config["dset_path"],
+        train_dataset = ClassificationCloudDataset(self.config["image_folder"],
                                                    df=train_df,
-                                                   datatype="train",
                                                    im_ids=train_ids,
                                                    transforms=train_aug,
                                                    preprocessing=preprocessing_transform)
-        valid_dataset = ClassificationCloudDataset(self.config["dset_path"],
+        valid_dataset = ClassificationCloudDataset(self.config["image_folder"],
                                                    df=train_df,
-                                                   datatype="valid",
                                                    im_ids=valid_ids,
                                                    transforms=val_aug,
                                                    preprocessing=preprocessing_transform)
