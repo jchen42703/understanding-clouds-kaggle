@@ -59,7 +59,7 @@ class TrainClassificationExperiment(object):
                                                     test_size=self.args.test_size)
         elif self.args.df_setup_type == "regular":
             print("Setting up df normally...")
-            train_ids, valid_ids = train_test_split(train["im_id"].drop_duplicates().values,
+            train_ids, valid_ids = train_test_split(train_df["im_id"].drop_duplicates().values,
                                                     random_state=self.args.split_seed,
                                                     test_size=self.args.test_size)
         return {"train_ids": train_ids, "valid_ids": valid_ids}
@@ -107,8 +107,8 @@ class TrainClassificationExperiment(object):
         return optimizer
 
     def get_lr_scheduler(self, optimizer):
-        assert isinstance(optimizer, torch.nn.optim.Optimizer), \
-            "`optimizer` must be an instance of torch.nn.optim.Optimizer"
+        assert isinstance(optimizer, torch.optim.Optimizer), \
+            "`optimizer` must be an instance of torch.optim.Optimizer"
         # fetching lr schedulers
         if self.args.scheduler.lower() == "plateau":
             scheduler = ReduceLROnPlateau(optimizer, factor=0.15, patience=2)
@@ -184,7 +184,7 @@ class TrainClassificationExperimentFromConfig(object):
                                                     test_size=test_size)
         elif df_setup_type == "regular":
             print("Setting up df normally...")
-            train_ids, valid_ids = train_test_split(train["im_id"].drop_duplicates().values,
+            train_ids, valid_ids = train_test_split(train_df["im_id"].drop_duplicates().values,
                                                     random_state=split_seed,
                                                     test_size=test_size)
         return {"train_ids": train_ids, "valid_ids": valid_ids}
@@ -245,8 +245,8 @@ class TrainClassificationExperimentFromConfig(object):
         return opt
 
     def get_lr_scheduler(self, optimizer):
-        assert isinstance(optimizer, torch.nn.optim.Optimizer), \
-            "`optimizer` must be an instance of torch.nn.optim.Optimizer"
+        assert isinstance(optimizer, torch.optim.Optimizer), \
+            "`optimizer` must be an instance of torch.optim.Optimizer"
         sched_params = self.opt_params["scheduler_params"]
         scheduler_name = sched_params["scheduler"].lower()
         scheduler_args = sched_params[scheduler_name]
