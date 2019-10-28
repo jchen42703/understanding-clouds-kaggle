@@ -5,7 +5,7 @@ from clouds.inference import Inference
 from clouds.inference.utils import tta_flips_fn, apply_nonlin
 
 class PseudoLabeler(Inference):
-    def __init__(self, checkpoint_paths, test_loader, test_dataset, models=None,
+    def __init__(self, checkpoint_paths, test_loader, models=None,
                  mode="classification", tta_flips=None, thresh=0.8):
         """
         Attributes:
@@ -15,12 +15,13 @@ class PseudoLabeler(Inference):
             mode (str): either "segmentation" or "classification". Defaults to "classifcation"
             tta_flips (list-like): consisting one of or all of ["lr_flip", "ud_flip", "lrud_flip"].
                 Defaults to None.
+            thresh (float): threshold for hard labels
         """
         assert mode == "classification"
         self.thresh = thresh
         super().__init__(checkpoint_paths=checkpoint_paths,
-                         test_loader=test_loader, test_dataset=test_dataset,
-                         models=models, mode=mode, tta_flips=tta_flips)
+                         test_loader=test_loader, models=models, mode=mode,
+                         tta_flips=tta_flips)
 
     def get_encoded_pixels(self):
         raise NotImplementedError

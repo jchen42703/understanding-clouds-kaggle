@@ -12,7 +12,7 @@ from clouds.inference.utils import mask2rle, post_process, load_weights_infer, \
                                   tta_flips_fn, apply_nonlin
 
 class Inference(object):
-    def __init__(self, checkpoint_paths, test_loader, test_dataset, models=None,
+    def __init__(self, checkpoint_paths, test_loader, models=None,
                  mode="segmentation", tta_flips=None):
         """
         Attributes:
@@ -27,7 +27,6 @@ class Inference(object):
 
         self.mode = mode
         self.loader = test_loader
-        self.dataset = test_dataset
         self.seg_class_params = {0: (0.5, 10000), 1: (0.5, 10000), 2: (0.5, 10000),
                                  3: (0.5, 10000)} # (threshold, min_size)
         self.tta_fn = None
@@ -66,8 +65,9 @@ class Inference(object):
         """
         Creates and saves a submission dataframe (classification/segmentation).
         Args:
-            sub (pd.DataFrame): the same sub used for the test_dataset; the sample_submission dataframe (stage1).
-                This is used to create the final submission dataframe
+            sub (pd.DataFrame): the same sub used for the test dataset;
+                the sample_submission dataframe (stage1). This is used to
+                create the final submission dataframe
         Returns:
             submission (pd.DataFrame): submission dataframe
         """
@@ -88,9 +88,9 @@ class Inference(object):
 
     def get_encoded_pixels(self):
         """
-        Processes predicted logits and converts them to encoded pixels. Does so in an iterative
-        manner so operations are done image-wise rather than on the full dataset directly (to
-        combat RAM limitations).
+        Processes predicted logits and converts them to encoded pixels. Does
+        so in an iterative manner so operations are done image-wise rather than
+        on the full dataset directly (to combat RAM limitations).
 
         Returns:
             encoded_pixels: list of rles in the order of self.loader

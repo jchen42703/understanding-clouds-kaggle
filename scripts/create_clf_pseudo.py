@@ -65,7 +65,7 @@ def main(config):
     test_loader = DataLoader(test_dataset, batch_size=io_params["batch_size"],
                              shuffle=False, num_workers=io_params["num_workers"])
     pseudo = PseudoLabeler(config["checkpoint_paths"], test_loader,
-                           test_dataset, models=models, mode=config["mode"],
+                           models=models, mode=config["mode"],
                            **config["pseudo_params"])
     pseudo.create_clf_pseudo_df(sub=sub, **config["hard_labels_params"])
 
