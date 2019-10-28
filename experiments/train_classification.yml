@@ -44,4 +44,4 @@
       activation: Sigmoid
     checkpoint_params:
       checkpoint_path: ~ # <- tilde for None /contents/logs/segmentation/best.pth
-      checkpoint_mode: model_only
+      mode: model_only
