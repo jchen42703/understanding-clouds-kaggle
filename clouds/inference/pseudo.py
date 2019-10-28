@@ -1,12 +1,12 @@
 import os
+import tqdm
 
 from clouds.inference import Inference
 from clouds.inference.utils import tta_flips_fn, apply_nonlin
 
 class PseudoLabeler(Inference):
     def __init__(self, checkpoint_paths, test_loader, test_dataset, models=None,
-                 mode="classification", tta_flips=None, thresh_lower=0.2,
-                 thresh_upper=0.8):
+                 mode="classification", tta_flips=None, thresh=0.8):
         """
         Attributes:
             checkpoint_paths (List[str]): Path to a checkpoint
@@ -17,8 +17,7 @@ class PseudoLabeler(Inference):
                 Defaults to None.
         """
         assert mode == "classification"
-        self.thresh_lower = thresh_lower
-        self.thresh_upper = thresh_upper
+        self.thresh = thresh
         super().__init__(checkpoint_paths=checkpoint_paths,
                          test_loader=test_loader, test_dataset=test_dataset,
                          models=models, mode=mode, tta_flips=tta_flips)
@@ -38,14 +37,18 @@ class PseudoLabeler(Inference):
             if self.tta_fn is not None:
                 pred_out = self.tta_fn(batch=test_batch[0].cuda())
             else:
+                # (batch_size, n_classes)
                 pred_out = apply_nonlin(self.model(test_batch[0].cuda()))
             # for each prediction (1,) in pred_out (n, 4): post process
             for pred in pred_out:
+                # (4, )
                 probability = pred.cpu().detach().numpy()
-                predictions.append(probability)
+                for prob_i in probability:
+                    # (1,)
+                    predictions.append(prob_i)
         return predictions
 
-    def create_prob_pred_df(self):
+    def create_soft_pseudo(self, sub):
         """
         Creates a dataframe with all of the probability predictions
         """
@@ -53,33 +56,32 @@ class PseudoLabeler(Inference):
             print("Classification: Predicting classes...")
             save_path = os.path.join(os.getcwd(), "clf_probabilities.csv")
             prob_preds = self.get_classification_predictions()
+        print(f"# of probs: {len(prob_preds)}")
         # Saving the submission dataframe
         sub["EncodedPixels"] = prob_preds
         sub.fillna("")
-        sub.to_csv(save_path, columns=["ImageId_ClassId", "EncodedPixels"],
+        sub.to_csv(save_path, columns=["Image_Label", "EncodedPixels"],
                    index=False)
         print(f"Saved {save_path}")
         return sub
 
-    def create_clf_pseudo_df(self):
+    def create_clf_hard_pseudo(self, sub, from_soft=False):
         """
-        Saves the classification pseudolabels in a dataframe.
-        * creates regular dataframe with all confidence values
-        * threshold them
-        * set the rest as NaN and drop all NaNs
-        * save the dataframe
+        Creates soft-pseudolabels if needed and thresholds them.
+        Args:
+            sub (pd.DataFrame): either the regular sample_submission.csv or
+                a dataframe from self.create_soft_pseudo
+            from_soft (bool): Whether or not `sub` contains the soft labels
+                from self.create_soft_pseudo or not.
         """
-        sub = self.create_prob_pred_df()
-        print(f"Number of predictions before: {len(sub)}")
+        if not from_soft:
+            sub = self.create_soft_pseudo(sub=sub)
         # thresholding to generate classification pseudolabels
-        sub[sub["EncodedPixels"] >= self.thresh_upper] = 1
-        sub[sub["EncodedPixels"] <= self.thresh_lower] = 0
-        # getting rid of non-pseudo-labels
-        sub[sub["EncodedPixels"] != 0 and sub["EncodedPixels"] != 1] = None
-        sub = sub.dropna()
+        sub.loc[sub["EncodedPixels"] >= self.thresh, "EncodedPixels"] = 1
+        sub.loc[sub["EncodedPixels"] < self.thresh, "EncodedPixels"] = 0
         print(f"Number of pseudo-labels: {len(sub)}")
         # saving the dataframe
         save_path = os.path.join(os.getcwd(), "clf_pseudo_labels.csv")
-        sub.to_csv(save_path, columns=["ImageId_ClassId", "EncodedPixels"],
+        sub.to_csv(save_path, columns=["Image_Label", "EncodedPixels"],
                    index=False)
         print(f"Saved the pseudo-label dataframe at {save_path}")
