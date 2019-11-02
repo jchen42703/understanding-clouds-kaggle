@@ -13,7 +13,7 @@ from clouds.inference.utils import mask2rle, post_process, load_weights_infer, \
 
 class Inference(object):
     def __init__(self, checkpoint_paths, test_loader, models=None,
-                 mode="segmentation", tta_flips=None):
+                 mode="segmentation", tta_flips=None, class_params=None):
         """
         Attributes:
             checkpoint_paths (List[str]): Path to a checkpoint
@@ -27,8 +27,16 @@ class Inference(object):
 
         self.mode = mode
         self.loader = test_loader
-        self.seg_class_params = {0: (0.5, 10000), 1: (0.5, 10000), 2: (0.5, 10000),
-                                 3: (0.5, 10000)} # (threshold, min_size)
+        if class_params is None:
+            if mode == "segmentation":
+                # class: (threshold, min_size)
+                self.class_params = {0: (0.5, 10000), 1: (0.5, 10000),
+                                     2: (0.5, 10000), 3: (0.5, 10000)}
+            elif mode == "classification":
+                self.class_params = 0.5
+        else:
+            self.class_params = class_params
+
         self.tta_fn = None
         if tta_flips is not None:
             assert isinstance(tta_flips, (list, tuple)), \
@@ -42,13 +50,23 @@ class Inference(object):
         Either loads a single checkpoint or loads an ensemble of checkpoints
         from `checkpoint_paths`
         """
+        assert isinstance(checkpoint_paths, list), \
+            "Make sure checkpoint_paths is specified in list format in the\
+            yaml file."
+        assert isinstance(models, list), \
+            "Make sure model_names is specified in list format in the\
+            yaml file."
+        assert len(checkpoint_paths) == len(models), \
+            "The number of checkpoints and models should be the same."
         # single model instances
-        if isinstance(checkpoint_paths, str):
+        if len(checkpoint_paths) == 1:
             try:
-                self.model = load(checkpoint_paths).cuda().eval()
+                # loading traceable
+                self.model = load(checkpoint_paths[0]).cuda().eval()
                 print(f"Traced model from {checkpoint_paths}")
             except:
-                self.model = load_weights_infer(checkpoint_paths, models).cuda().eval()
+                self.model = load_weights_infer(checkpoint_paths[0],
+                                                models[0]).cuda().eval()
                 print(f"Loaded model from {checkpoint_paths}")
         # ensembled models
         elif len(checkpoint_paths) > 1:
@@ -82,7 +100,7 @@ class Inference(object):
         # Saving the submission dataframe
         sub["EncodedPixels"] = encoded_pixels
         sub.fillna("")
-        sub.to_csv(save_path, columns=["ImageId_ClassId", "EncodedPixels"], index=False)
+        sub.to_csv(save_path, columns=["Image_Label", "EncodedPixels"], index=False)
         print(f"Saved the submission file at {save_path}")
         return sub
 
@@ -107,10 +125,16 @@ class Inference(object):
                 for probability in batch:
                     # iterating through each probability map (h, w)
                     probability = probability.cpu().detach().numpy()
-                    if probability.shape != (256, 1600):
-                        probability = cv2.resize(probability, dsize=(1600, 256), interpolation=cv2.INTER_LINEAR)
-                    predict, num_predict = post_process(probability, self.seg_class_params[image_id % 4][0],
-                                                        self.seg_class_params[image_id % 4][1])
+                    if probability.shape != (350, 525):
+                        # cv2 -> (w, h); np -> (h, w)
+                        probability = cv2.resize(probability, dsize=(525, 350),
+                                                 interpolation=cv2.INTER_LINEAR)
+                    thresh = self.class_params[image_id % 4][0]
+                    min_size = self.class_params[image_id % 4][1]
+                    predict, num_predict = post_process(probability,
+                                                        thresh,
+                                                        min_size,
+                                                        pred_shape=(350, 525))
                     if num_predict == 0:
                         encoded_pixels.append("")
                     else:
@@ -138,8 +162,9 @@ class Inference(object):
             for i, batch in enumerate(pred_out):
                 # iterating through each prediction (4,)
                 probability = batch.cpu().detach().numpy()
-
-                predict = cv2.threshold(probability, 0.5, 1, cv2.THRESH_BINARY)[1]
+                thresh = self.class_params
+                predict = cv2.threshold(probability, thresh, 1,
+                                        cv2.THRESH_BINARY)[1]
                 # Idea: [imgid_1, imgid_2, imgid_3, imgid_4, imgid2_1,...]
                 def process(element):
                     if element == 0:
