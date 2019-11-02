@@ -1,0 +1,37 @@
+  train_csv_path: /content/train.csv
+  sample_sub_csv_path: /content/sample_submission.csv
+  mode: classification
+
+  io_params:
+    image_folder: /content/test_images
+    batch_size: 18
+    num_workers: 0
+    aug_key: aug1
+
+  model_names:
+    - se_resnext50_32x4d
+    - se_resnext50_32x4d
+
+  checkpoint_paths:
+    - /content/se_resnext50_32x4d_seed82_15epochs_aug2_full_best.pth
+    - /content/se_resnext50_32x4d_seed200_15epochs_aug2_full_last_full.pth
+    # - se_resnext50_32x4d_seed122_26epochs_checkpoint.pth
+
+  infer_params:
+    tta_flips: ~
+      # - lr_flip
+      # - ud_flip
+      # - lrud_flip
+    class_params: 0.8
+      # 0:
+      #   - 0.5
+      #   - 10000
+      # 1:
+      #   - 0.5
+      #   - 10000
+      # 2:
+      #   - 0.5
+      #   - 10000
+      # 3:
+      #   - 0.5
+      #   - 10000
