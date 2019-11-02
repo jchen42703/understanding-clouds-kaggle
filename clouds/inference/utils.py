@@ -38,8 +38,8 @@ def get_df_histogram(df):
     From: https://www.kaggle.com/lightforever/severstal-mlcomp-catalyst-infer-0-90672
     """
     df = df.fillna("")
-    df["Image"] = df["ImageId_ClassId"].map(lambda x: x.split("_")[0])
-    df["Class"] = df["ImageId_ClassId"].map(lambda x: x.split("_")[1])
+    df["Image"] = df["Image_Label"].map(lambda x: x.split("_")[0])
+    df["Class"] = df["Image_Label"].map(lambda x: x.split("_")[1])
     df["empty"] = df["EncodedPixels"].map(lambda x: not x)
     print(df[df["empty"] == False]["Class"].value_counts())
 
