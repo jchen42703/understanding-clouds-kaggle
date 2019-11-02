@@ -32,6 +32,8 @@ class CloudDataset(Dataset):
         if isinstance(masks_folder, str):
             self.use_resized_dataset = True
             print(f"Using resized masks in {masks_folder}...")
+        else:
+            self.use_resized_dataset = False
         self.img_ids = im_ids
         self.transforms = transforms
         self.preprocessing = preprocessing
