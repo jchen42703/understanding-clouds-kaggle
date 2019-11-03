@@ -202,7 +202,7 @@ class TrainExperiment(object):
                 # everything in the path besides the base file name
                 resume_dir = str(ckpoint_p.parents[0])
                 print(f"Loading {fname} from {resume_dir}. \
-                      Checkpoints will also be saved in {resume_dir}.")
+                      \nCheckpoints will also be saved in {resume_dir}.")
                 # adding the checkpoint callback
                 callbacks_list = callbacks_list + [CheckpointCallback(resume=fname,
                                                                       resume_dir=resume_dir),]
@@ -286,7 +286,8 @@ class TrainSegExperimentFromConfig(TrainExperiment):
         Creates and returns the train and validation datasets.
         """
         # preparing transforms
-        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.config["encoder"],
+        encoder = self.model_params["encoder"]
+        preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder,
                                                              "imagenet")
         preprocessing_transform = get_preprocessing(preprocessing_fn)
         train_aug = get_training_augmentation(self.io_params["aug_key"])
