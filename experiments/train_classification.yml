@@ -1,4 +1,4 @@
-  dset_path: /content/
+  mode: classification
   logdir: /content/logs/segmentation/
   train_csv_path: /content/train.csv
   sample_sub_csv_path: /content/sample_submission.csv
