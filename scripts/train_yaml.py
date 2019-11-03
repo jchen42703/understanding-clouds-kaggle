@@ -1,7 +1,8 @@
 from catalyst.dl.runner import SupervisedRunner
 
 from utils import seed_everything
-from experiment import TrainClassificationExperimentFromConfig
+from experiment import TrainClassificationExperimentFromConfig, \
+                       TrainSegExperimentFromConfig
 
 def main(config):
     """
@@ -14,8 +15,18 @@ def main(config):
         None
     """
     # setting up the train/val split with filenames
-    seed_everything(config["io_params"]["split_seed"])
-    exp = TrainClassificationExperimentFromConfig(config)
+    seed = config["io_params"]["split_seed"]
+    seed_everything(seed)
+    mode = config["mode"].lower()
+    assert mode in ["classification", "segmentation"], \
+        "The `mode` must be one of ['classification', 'segmentation']."
+    if mode == "classification":
+        exp = TrainClassificationExperimentFromConfig(config)
+    elif mode == "segmentation":
+        exp = TrainSegExperimentFromConfig(config)
+
+    print(f"Seed: {seed}\nMode: {mode}")
+
     runner = SupervisedRunner()
 
     runner.train(
