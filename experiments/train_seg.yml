@@ -19,11 +19,11 @@
   model_params:
     encoder: se_resnext50_32x4d
     decoder: unet # fpn
-      unet:
-        attention_type: ~ # scse
-        decoder_use_batchnorm: True # inplace for InplaceABN
-      fpn:
-        dropout: 0.2
+    unet:
+      attention_type: ~ # scse
+      decoder_use_batchnorm: True # inplace for InplaceABN
+    fpn:
+      dropout: 0.2
 
   opt_params:
     opt: sgd
@@ -53,4 +53,4 @@
       activation: Sigmoid
     checkpoint_params:
       checkpoint_path: ~ # <- tilde for None /contents/logs/segmentation/best.pth
-      checkpoint_mode: model_only
+      mode: model_only
