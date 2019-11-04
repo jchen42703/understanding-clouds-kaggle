@@ -45,6 +45,9 @@ class CloudDataset(Dataset):
         else:
             mask = make_mask_resized_dset(self.df, image_name,
                                           self.masks_folder)
+            # Note: the resized masks are not binary but are very close to
+            # being binary either <0.1 or >0.98
+            mask = (mask > 0.9) * 1 # faster thresholding for binary labels
         # loading image
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
