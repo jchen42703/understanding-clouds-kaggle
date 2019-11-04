@@ -6,7 +6,7 @@ import pandas as pd
 from abc import abstractmethod
 from pathlib import Path
 from catalyst.dl.callbacks import AccuracyCallback, EarlyStoppingCallback, \
-                                  CheckpointCallback
+                                  CheckpointCallback, PrecisionRecallF1ScoreCallback
 from catalyst.dl.runner import SupervisedRunner
 
 from sklearn.model_selection import train_test_split
@@ -16,7 +16,6 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, \
 
 from clouds.models import Pretrained
 from clouds.io import ClassificationCloudDataset, CloudDataset
-from clouds.custom.ppv_tpr_f1 import PrecisionRecallF1ScoreCallback
 from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, \
                   setup_train_and_sub_df, seed_everything
 
