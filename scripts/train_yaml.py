@@ -38,7 +38,8 @@ def main(config):
         callbacks=exp.cb_list,
         logdir=config["logdir"],
         num_epochs=config["num_epochs"],
-        verbose=True
+        verbose=True,
+        fp16=config["fp16"]
     )
 
 if __name__ == "__main__":

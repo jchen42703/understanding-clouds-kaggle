@@ -15,6 +15,7 @@
 
   loss: bce_dice_loss
   num_epochs: 17
+  fp16: False
 
   model_params:
     encoder: se_resnext50_32x4d
