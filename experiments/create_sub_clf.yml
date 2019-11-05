@@ -6,15 +6,15 @@
     image_folder: /content/test_images
     batch_size: 18
     num_workers: 0
-    aug_key: aug1
+    aug_key: aug2
 
-  model_names:
-    - se_resnext50_32x4d
-    - se_resnext50_32x4d
+  model_params:
+    encoders:
+      - se_resnext50_32x4d
+      - se_resnext50_32x4d
 
   checkpoint_paths:
     - /content/se_resnext50_32x4d_seed82_15epochs_aug2_full_best.pth
-    - /content/se_resnext50_32x4d_seed200_15epochs_aug2_full_last_full.pth
     # - se_resnext50_32x4d_seed122_26epochs_checkpoint.pth
 
   infer_params:
@@ -22,16 +22,4 @@
       # - lr_flip
       # - ud_flip
       # - lrud_flip
-    class_params: 0.8
-      # 0:
-      #   - 0.5
-      #   - 10000
-      # 1:
-      #   - 0.5
-      #   - 10000
-      # 2:
-      #   - 0.5
-      #   - 10000
-      # 3:
-      #   - 0.5
-      #   - 10000
+    class_params: 0.6
