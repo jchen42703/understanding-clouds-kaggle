@@ -115,10 +115,10 @@ class TrainExperiment(object):
         # doing the splits
         if df_setup_type == "pos_only":
             print("Splitting the df with pos only ids...")
-            assert id_mask_count is not None
+            assert self.id_mask_count is not None
             train_ids, valid_ids = train_test_split(self.id_mask_count["im_id"].values,
                                                     random_state=split_seed,
-                                                    stratify=id_mask_count["count"],
+                                                    stratify=self.id_mask_count["count"],
                                                     test_size=test_size)
         elif df_setup_type == "regular":
             print("Splitting the df normally...")
