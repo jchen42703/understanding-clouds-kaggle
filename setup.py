@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='clouds',
-      version='0.01.2',
+      version='0.01.3',
       description='Understanding Clouds from Satellite Images',
       url='',
       author='Joseph Chen',
