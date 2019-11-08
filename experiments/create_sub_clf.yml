@@ -11,7 +11,7 @@
   model_params:
     encoders:
       - se_resnext50_32x4d
-      - se_resnext50_32x4d
+      # - se_resnext50_32x4d
 
   checkpoint_paths:
     - /content/se_resnext50_32x4d_seed82_15epochs_aug2_full_best.pth
