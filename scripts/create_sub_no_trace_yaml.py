@@ -52,8 +52,8 @@ def main(config):
                                     im_ids=test_ids,
                                     transforms=val_aug,
                                     preprocessing=preprocessing_transform)
-        pairs = zip(model_params["encoders"], model_params["decoders"])
-        print(f"Models: {list(pairs)}")
+        pairs = list(zip(model_params["encoders"], model_params["decoders"]))
+        print(f"Models: {pairs}")
         # setting up the seg model
         models = [smp.__dict__[decoder](encoder_name=encoder,
                                         encoder_weights=None,
