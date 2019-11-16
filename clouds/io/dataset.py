@@ -48,6 +48,7 @@ class CloudDataset(Dataset):
             mask = make_mask_resized_dset(self.df, image_name,
                                           self.masks_folder,
                                           shape=self.mask_shape)
+        mask = (mask > 0.9)*1
         # loading image
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
