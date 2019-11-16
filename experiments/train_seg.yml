@@ -12,6 +12,9 @@
     batch_size: 18
     num_workers: 2
     aug_key: aug1
+    mask_shape:
+      - 320
+      - 640
 
   loss: bce_dice_loss
   num_epochs: 17

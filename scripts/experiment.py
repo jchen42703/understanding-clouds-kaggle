@@ -297,13 +297,15 @@ class TrainSegExperimentFromConfig(TrainExperiment):
                                      im_ids=train_ids,
                                      masks_folder=self.io_params["masks_folder"],
                                      transforms=train_aug,
-                                     preprocessing=preprocessing_transform)
+                                     preprocessing=preprocessing_transform,
+                                     mask_shape=self.io_params["mask_shape"])
         valid_dataset = CloudDataset(self.io_params["image_folder"],
                                      df=self.df,
                                      im_ids=valid_ids,
                                      masks_folder=self.io_params["masks_folder"],
                                      transforms=val_aug,
-                                     preprocessing=preprocessing_transform)
+                                     preprocessing=preprocessing_transform,
+                                     mask_shape=self.io_params["mask_shape"])
         return (train_dataset, valid_dataset)
 
     def get_model(self):
