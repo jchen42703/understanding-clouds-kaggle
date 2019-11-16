@@ -13,7 +13,7 @@ class CloudDataset(Dataset):
     def __init__(self, data_folder: str, df: pd.DataFrame, im_ids: np.array,
                  masks_folder: str=None,
                  transforms=albu.Compose([albu.HorizontalFlip(), AT.ToTensor()]),
-                 preprocessing=None):
+                 preprocessing=None, mask_shape=(320, 640)):
         """
         Attributes
             data_folder (str): path to the image directory
@@ -25,6 +25,7 @@ class CloudDataset(Dataset):
                 before preprocessing. Defaults to HFlip and ToTensor
             preprocessing: ops to perform after transforms, such as
                 z-score standardization. Defaults to None.
+            mask_shape (tuple): <- mask shape (numpy format, not cv2)
         """
         self.df = df
         self.data_folder = data_folder
@@ -37,6 +38,7 @@ class CloudDataset(Dataset):
         self.img_ids = im_ids
         self.transforms = transforms
         self.preprocessing = preprocessing
+        self.mask_shape = mask_shape
 
     def __getitem__(self, idx):
         image_name = self.img_ids[idx]
@@ -44,10 +46,8 @@ class CloudDataset(Dataset):
             mask = make_mask(self.df, image_name)
         else:
             mask = make_mask_resized_dset(self.df, image_name,
-                                          self.masks_folder)
-            # Note: the resized masks are not binary but are very close to
-            # being binary either <0.1 or >0.98
-            mask = (mask > 0.9) * 1 # faster thresholding for binary labels
+                                          self.masks_folder,
+                                          shape=self.mask_shape)
         # loading image
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
