@@ -153,6 +153,6 @@ class GeneralInferExperiment(InferExperiment):
                       for name in self.encoders]
         elif self.mode == "both":
             print("Currently only supporting: clouds.models.ResNet34FPN")
-            models = [ResNet34FPN(num_classes=4)
+            models = [ResNet34FPN(num_classes=4, do_inference=True)
                       for name in self.encoders]
         return models
