@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -47,7 +48,7 @@ def resize_like(x, reference, mode="bilinear"):
 
 
 def upsize_add(x, lateral):
-    x = resize_like(x, lateral, mode="nearest")  + lateral
+    x = resize_like(x, lateral, mode="nearest") + lateral
     return x
 
 

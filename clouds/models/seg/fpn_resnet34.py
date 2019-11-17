@@ -1,11 +1,13 @@
 import torchvision
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-from .model_utils import SCse, ConvGnUp2d
+from .model_utils import SCse, ConvGnUp2d, fuse, upsize_add
 
 class ResNet34FPN(nn.Module):
     def __init__(self, num_class=4):
-        super(Net, self).__init__()
+        super(ResNet34FPN, self).__init__()
 
         # e = ResNet34()
         self.resnet = torchvision.models.resnet34(True)
@@ -44,7 +46,7 @@ class ResNet34FPN(nn.Module):
 
 
     def forward(self, x):
-        batch_size,C,H,W = x.shape
+        batch_size, C, H, W = x.shape
 
         x0 = self.conv1(x)
         x1 = self.encode2(x0)
@@ -64,7 +66,7 @@ class ResNet34FPN(nn.Module):
         t2 = self.top2(t2) #; print(t2.shape)
         t3 = self.top3(t3) #; print(t3.shape)
 
-        x = fuse([t1,t2,t3], 'cat')
+        x = fuse([t1,t2,t3], "cat")
         logit = self.logit(x)
 
         #---
