@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, \
                                      CosineAnnealingWarmRestarts, CyclicLR
 from clouds.models import Pretrained, ResNet34FPN
+from clouds.metrics import BCEDiceLoss, FocalLoss, HengFocalLoss
 from clouds.io import ClassificationCloudDataset, CloudDataset, \
                       ClfSegCloudDataset
 from .utils import get_preprocessing, get_training_augmentation, \
@@ -69,6 +70,7 @@ class TrainExperiment(object):
         self.io_params = config["io_params"]
         self.opt_params = config["opt_params"]
         self.cb_params = config["callback_params"]
+        self.criterion_params = config["criterion_params"]
         # initializing the experiment components
         self.df, _, self.id_mask_count = self.setup_df()
         train_ids, val_ids = self.get_split()
@@ -178,7 +180,7 @@ class TrainExperiment(object):
         return scheduler
 
     def get_criterion(self):
-        loss_name = self.config["loss"].lower()
+        loss_name = self.criterion_params["loss"].lower()
         if loss_name == "bce_dice_loss":
             criterion = smp.utils.losses.BCEDiceLoss(eps=1.)
         elif loss_name == "bce":
@@ -394,6 +396,72 @@ class TrainClfSegExperiment(TrainExperiment):
         print(f"Total # of Params: {total}\nTrainable params: {trainable}")
 
         return model
+
+    def get_criterion(self):
+        loss_dict = {
+            "bce_dice_loss": BCEDiceLoss(activation="sigmoid"),
+            "bce": torch.nn.BCEWithLogitsLoss(),
+            "bce_no_logits": torch.nn.BCE(),
+            "focal_loss": FocalLoss(logits=False),
+            "heng_focal_loss": HengFocalLoss(),
+        }
+
+        seg_loss_name = self.criterion_params["seg_loss"].lower()
+        clf_loss_name = self.criterion_params["clf_loss"].lower()
+
+        # re-initializing criterion with kwargs
+        seg_kwargs = self.criterion_params.get(seg_loss_name)
+        clf_kwargs = self.criterion_params.get(clf_loss_name)
+        seg_kwargs = {} if seg_kwargs is None else seg_kwargs
+        clf_kwargs = {} if clf_kwargs is None else clf_kwargs
+
+        seg_loss = loss_dict[seg_loss_name].__init__(**seg_kwargs)
+        clf_loss = loss_dict[clf_loss_name].__init__(**clf_kwargs)
+
+        criterion_dict = {seg_loss_name: seg_loss,
+                          clf_loss_name: clf_loss}
+        print(f"Criterion: {criterion_dict}")
+        return criterion_dict
+
+    def get_callbacks(self):
+        from catalyst.dl.callbacks import CriterionAggregatorCallback, \
+                                          CriterionCallback
+        seg_loss_name = self.criterion_params["seg_loss"].lower()
+        clf_loss_name = self.criterion_params["clf_loss"].lower()
+        callbacks_list = [
+                          CriterionCallback(prefix="seg_loss",
+                                            input_key="seg_targets",
+                                            output_key="seg_logits",
+                                            criterion_key=seg_loss_name),
+                          CriterionCallback(prefix="clf_loss",
+                                            input_key="clf_targets",
+                                            output_key="clf_logits",
+                                            criterion_key=clf_loss_name),
+                          CriterionAggregatorCallback(prefix="loss",
+                                                      loss_keys=\
+                                                      ["seg_loss", "clf_loss"]),
+                          EarlyStoppingCallback(**self.cb_params["earlystop"]),
+                          ]
+
+        ckpoint_params = self.cb_params["checkpoint_params"]
+        if ckpoint_params["checkpoint_path"] != None: # hacky way to say no checkpoint callback but eh what the heck
+            mode = ckpoint_params["mode"].lower()
+            if mode == "full":
+                print("Stateful loading...")
+                ckpoint_p = Path(ckpoint_params["checkpoint_path"])
+                fname = ckpoint_p.name
+                # everything in the path besides the base file name
+                resume_dir = str(ckpoint_p.parents[0])
+                print(f"Loading {fname} from {resume_dir}. \
+                      \nCheckpoints will also be saved in {resume_dir}.")
+                # adding the checkpoint callback
+                callbacks_list = callbacks_list + [CheckpointCallback(resume=fname,
+                                                                      resume_dir=resume_dir),]
+            elif mode == "model_only":
+                print("Loading weights into model...")
+                self.model = load_weights_train(ckpoint_params["checkpoint_path"], self.model)
+        print(f"Callbacks: {callbacks_list}")
+        return callbacks_list
 
 def load_weights_train(checkpoint_path, model):
     """
