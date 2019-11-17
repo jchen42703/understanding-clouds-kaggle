@@ -31,6 +31,7 @@
     # for clf_seg
     seg_loss: bce
     # can specify kwargs:
+    bce:
       reduction: "mean"
     clf_loss: heng_focal_loss
     # heng_focal_loss has no kwargs to specify!
