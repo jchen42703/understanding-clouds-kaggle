@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from .model_utils import SCse, ConvGnUp2d, fuse, upsize_add
 
 class ResNet34FPN(nn.Module):
-    def __init__(self, num_class=4):
+    def __init__(self, num_classes=4):
         super(ResNet34FPN, self).__init__()
 
         # e = ResNet34()
@@ -42,7 +42,7 @@ class ResNet34FPN(nn.Module):
         self.top3 = nn.Sequential(
             ConvGnUp2d(128, 64, True),
         )
-        self.logit = nn.Conv2d(64*3,num_class,kernel_size=1)
+        self.logit = nn.Conv2d(64*3, num_classes, kernel_size=1)
 
 
     def forward(self, x):
@@ -66,7 +66,7 @@ class ResNet34FPN(nn.Module):
         t2 = self.top2(t2) #; print(t2.shape)
         t3 = self.top3(t3) #; print(t3.shape)
 
-        x = fuse([t1,t2,t3], "cat")
+        x = fuse([t1, t2, t3], "cat")
         logit = self.logit(x)
 
         #---
