@@ -2,6 +2,8 @@
   sample_sub_csv_path: /content/sample_submission.csv
   mode: both
   logdir: /content/logs/segmentation/
+  num_epochs: 17
+  fp16: False
 
   io_params:
     image_folder: /content/train_images
@@ -13,12 +15,8 @@
     num_workers: 2
     aug_key: aug6
     mask_shape:
-      - 696
-      - 1048
-
-  loss: bce_dice_loss
-  num_epochs: 17
-  fp16: False
+      - 700
+      - 1050
 
   model_params:
     encoder: resnet34

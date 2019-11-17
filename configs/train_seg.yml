@@ -2,6 +2,8 @@
   logdir: /content/logs/segmentation/
   train_csv_path: /content/train.csv
   sample_sub_csv_path: /content/sample_submission.csv
+  num_epochs: 17
+  fp16: False
 
   io_params:
     image_folder: /content/train_images
@@ -15,9 +17,6 @@
     mask_shape:
       - 320
       - 640
-
-  num_epochs: 17
-  fp16: False
 
   model_params:
     encoder: se_resnext50_32x4d
