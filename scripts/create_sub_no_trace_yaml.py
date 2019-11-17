@@ -21,7 +21,7 @@ def main(config):
     infer = Inference(config["checkpoint_paths"], exp.loaders["test"],
                       models=exp.models, mode=exp.mode,
                       **config["infer_params"])
-    out_df = infer.create_sub(sub=sub)
+    out_df = infer.create_sub(sub=exp.sample_sub)
 
 if __name__ == "__main__":
     import yaml
