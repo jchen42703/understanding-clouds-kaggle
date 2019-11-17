@@ -70,6 +70,7 @@ class TrainExperiment(object):
         self.io_params = config["io_params"]
         self.opt_params = config["opt_params"]
         self.cb_params = config["callback_params"]
+        self.model_params = config["model_params"]
         self.criterion_params = config["criterion_params"]
         # initializing the experiment components
         self.df, _, self.id_mask_count = self.setup_df()
@@ -237,7 +238,7 @@ class TrainClassificationExperiment(TrainExperiment):
         Creates and returns the train and validation datasets.
         """
         # preparing transforms
-        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.config["model_name"],
+        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.model_params["encoder"],
                                                              "imagenet")
         preprocessing_transform = get_preprocessing(preprocessing_fn)
         train_aug = get_training_augmentation(self.io_params["aug_key"])
@@ -257,7 +258,7 @@ class TrainClassificationExperiment(TrainExperiment):
 
     def get_model(self):
         # setting up the classification model
-        model = Pretrained(variant=self.config["model_name"], num_classes=4,
+        model = Pretrained(variant=self.model_params["encoder"], num_classes=4,
                            pretrained=True, activation=None)
         return model
 
@@ -280,7 +281,6 @@ class TrainSegExperiment(TrainExperiment):
         Args:
             config (dict): from `train_seg_yaml.py`
         """
-        self.model_params = config["model_params"]
         super().__init__(config=config)
 
     def get_datasets(self, train_ids, valid_ids):
