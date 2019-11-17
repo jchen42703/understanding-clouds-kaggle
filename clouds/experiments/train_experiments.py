@@ -13,11 +13,12 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, \
                                      CosineAnnealingWarmRestarts, CyclicLR
-
-from clouds.models import Pretrained
-from clouds.io import ClassificationCloudDataset, CloudDataset
-from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, \
-                  setup_train_and_sub_df, seed_everything
+from clouds.models import Pretrained, ResNet34FPN
+from clouds.io import ClassificationCloudDataset, CloudDataset, \
+                      ClfSegCloudDataset
+from .utils import get_preprocessing, get_training_augmentation, \
+                   get_validation_augmentation, setup_train_and_sub_df, \
+                   seed_everything
 
 class TrainExperiment(object):
     def __init__(self, config: dict):
@@ -210,7 +211,7 @@ class TrainExperiment(object):
                 self.model = load_weights_train(ckpoint_params["checkpoint_path"], self.model)
         return callbacks_list
 
-class TrainClassificationExperimentFromConfig(TrainExperiment):
+class TrainClassificationExperiment(TrainExperiment):
     """
     Stores the main parts of a classification experiment:
     - df split
@@ -258,7 +259,7 @@ class TrainClassificationExperimentFromConfig(TrainExperiment):
                            pretrained=True, activation=None)
         return model
 
-class TrainSegExperimentFromConfig(TrainExperiment):
+class TrainSegExperiment(TrainExperiment):
     """
     Stores the main parts of a segmentation experiment:
     - df split
@@ -323,6 +324,70 @@ class TrainSegExperimentFromConfig(TrainExperiment):
             model = smp.FPN(encoder_name=encoder, encoder_weights="imagenet",
                             classes=4, activation=None,
                             **self.model_params[decoder])
+        # calculating # of parameters
+        total = sum(p.numel() for p in model.parameters())
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"Total # of Params: {total}\nTrainable params: {trainable}")
+
+        return model
+
+class TrainClfSegExperiment(TrainExperiment):
+    """
+    Stores the main parts of a classification + segmentation experiment:
+    - df split
+    - datasets
+    - loaders
+    - model
+    - optimizer
+    - lr_scheduler
+    - criterion
+    - callbacks
+    Note: There is no model_name for this experiment. There is `encoder` and
+    `decoder` under `model_params`. You can also specify the attention_type
+    """
+    def __init__(self, config: dict):
+        """
+        Args:
+            config (dict): from `train_seg_yaml.py`
+        """
+        self.model_params = config["model_params"]
+        super().__init__(config=config)
+
+    def get_datasets(self, train_ids, valid_ids):
+        """
+        Creates and returns the train and validation datasets.
+        """
+        # preparing transforms
+        encoder = self.model_params["encoder"]
+        preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder,
+                                                             "imagenet")
+        preprocessing_transform = get_preprocessing(preprocessing_fn)
+        train_aug = get_training_augmentation(self.io_params["aug_key"])
+        val_aug = get_validation_augmentation(self.io_params["aug_key"])
+        # creating the datasets
+        train_dataset = ClfSegCloudDataset(self.io_params["image_folder"],
+                                           df=self.df,
+                                           im_ids=train_ids,
+                                           masks_folder=self.io_params["masks_folder"],
+                                           transforms=train_aug,
+                                           preprocessing=preprocessing_transform,
+                                           mask_shape=self.io_params["mask_shape"])
+        valid_dataset = ClfSegCloudDataset(self.io_params["image_folder"],
+                                           df=self.df,
+                                           im_ids=valid_ids,
+                                           masks_folder=self.io_params["masks_folder"],
+                                           transforms=val_aug,
+                                           preprocessing=preprocessing_transform,
+                                           mask_shape=self.io_params["mask_shape"])
+        return (train_dataset, valid_dataset)
+
+    def get_model(self):
+        encoder = self.model_params["encoder"].lower()
+        decoder = self.model_params["decoder"].lower()
+        print(f"\nEncoder: {encoder}, Decoder: {decoder}")
+        assert encoder == "resnet34" and decoder == "fpn", \
+            "Currently only ResNet34FPN is supported for CLF+Seg."
+        model = ResNet34FPN(num_class=4)
         # calculating # of parameters
         total = sum(p.numel() for p in model.parameters())
         trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
