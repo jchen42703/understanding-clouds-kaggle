@@ -5,6 +5,7 @@ import segmentation_models_pytorch as smp
 import torch
 from torch.utils.data import DataLoader
 
+from clouds.models import Pretrained, ResNet34FPN
 from clouds.io import ClassificationCloudDataset, CloudDataset, \
                       ClfSegCloudDataset
 from .utils import setup_train_and_sub_df, get_validation_augmentation, \
@@ -39,7 +40,7 @@ class InferExperiment(object):
         test_ids = self.get_test_ids()
         self.test_dset = self.get_datasets(test_ids)
         self.loaders = self.get_loaders()
-        self.model = self.get_model()
+        self.models = self.get_models()
 
     @abstractmethod
     def get_datasets(self, test_ids):
@@ -75,8 +76,6 @@ class InferExperiment(object):
         image_labels = self.sample_sub["Image_Label"]
         test_ids = image_labels.apply(lambda x: x.split("_")[0]).drop_duplicates().values
         print(f"Number of test ids: {len(test_ids)}")
-        n_encoded = len(sub["EncodedPixels"])
-        print(f"length of sub: {n_encoded}")
         return test_ids
 
     def get_loaders(self):
@@ -110,10 +109,10 @@ class GeneralInferExperiment(InferExperiment):
             loaders (dict): train/validation loaders
             model (torch.nn.Module): <-
         """
+        self.mode = config["mode"]
+        self.encoders = config["model_params"].get("encoders")
+        self.decoders = config["model_params"].get("decoders")
         super().__init__(config=config)
-        self.mode = self.config["mode"]
-        self.encoders = self.config["encoders"]
-        self.decoders = self.config["decoders"]
 
     def get_datasets(self, test_ids):
         preprocessing_fn = smp.encoders.get_preprocessing_fn(self.encoders[0],
@@ -123,13 +122,15 @@ class GeneralInferExperiment(InferExperiment):
         # fetching the proper datasets and models
         print("Assuming that all encoders are from the same family...")
         if self.mode == "segmentation" or self.mode == "both":
-            test_dataset = CloudDataset(self.io_params["image_folder"], df=sub,
+            test_dataset = CloudDataset(self.io_params["image_folder"],
+                                        df=self.sample_sub,
                                         im_ids=test_ids,
                                         transforms=val_aug,
                                         preprocessing=preprocessing_transform)
         elif self.mode == "classification":
             test_dataset = ClassificationCloudDataset(self.io_params["image_folder"],
-                                                      df=sub, im_ids=test_ids,
+                                                      df=self.sample_sub,
+                                                      im_ids=test_ids,
                                                       transforms=val_aug,
                                                       preprocessing=preprocessing_transform)
         return test_dataset
