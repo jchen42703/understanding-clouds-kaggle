@@ -13,8 +13,8 @@ from torch.utils.data import DataLoader
 from clouds.models import Pretrained
 from clouds.io import CloudDataset, ClassificationCloudDataset
 from clouds.inference import Inference
-from utils import get_validation_augmentation, get_preprocessing, \
-                  setup_train_and_sub_df
+from clouds.experiments.utils import get_validation_augmentation, \
+                                     get_preprocessing, setup_train_and_sub_df
 
 def main(config):
     """
