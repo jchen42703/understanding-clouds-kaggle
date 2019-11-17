@@ -101,7 +101,7 @@ def get_training_augmentation(augmentation_key="aug5"):
                                                                    scale=(1.0, 0.9),
                                                                    ratio=(0.75, 1.33)),
                                             albu.RandomCrop(height=696, width=1048)
-                                           ], p=0.3),
+                                           ], p=1),
                                 albu.Lambda(image=do_noise, p=0.5),
                               ],
                      }
