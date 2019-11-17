@@ -104,3 +104,50 @@ class ClassificationCloudDataset(Dataset):
 
     def __len__(self):
         return len(self.img_ids)
+
+class ClfSegCloudDataset(CloudDataset):
+    def __init__(self, data_folder: str, df: pd.DataFrame, im_ids: np.array,
+                 masks_folder: str=None,
+                 transforms=albu.Compose([albu.HorizontalFlip(), AT.ToTensor()]),
+                 preprocessing=None, mask_shape=(320, 640)):
+        """
+        Attributes
+            data_folder (str): path to the image directory
+            df (pd.DataFrame): dataframe with the labels
+            im_ids (np.ndarray): of image names.
+            masks_folder (str): path to the masks directory
+                assumes `use_resized_dataset == True`
+            transforms (albumentations.augmentation): transforms to apply
+                before preprocessing. Defaults to HFlip and ToTensor
+            preprocessing: ops to perform after transforms, such as
+                z-score standardization. Defaults to None.
+            mask_shape (tuple): <- mask shape (numpy format, not cv2)
+        """
+        df["hasMask"] = ~ df["EncodedPixels"].isna()
+        super().__init__(data_folder=data_folder, df=df, im_ids=im_ids,
+                         masks_folder=masks_folder, transforms=transforms,
+                         preprocessing=preprocessing, mask_shape=mask_shape)
+
+    def __getitem__(self, idx):
+        image_name = self.img_ids[idx]
+        if not self.use_resized_dataset:
+            mask = make_mask(self.df, image_name)
+        else:
+            mask = make_mask_resized_dset(self.df, image_name,
+                                          self.masks_folder,
+                                          shape=self.mask_shape)
+        mask = (mask > 0.9)*1
+        # loading image
+        image_path = os.path.join(self.data_folder, image_name)
+        img = cv2.imread(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        class_label = get_classification_label(self.df, image_name)
+        # apply augmentations
+        augmented = self.transforms(image=img, mask=mask)
+        img = augmented["image"]
+        mask = augmented["mask"]
+        if self.preprocessing:
+            preprocessed = self.preprocessing(image=img, mask=mask)
+            img = preprocessed["image"]
+            mask = preprocessed["mask"]
+        return (img, class_label, mask)
