@@ -6,11 +6,18 @@ import torch.nn.functional as F
 from .model_utils import SCse, ConvGnUp2d, fuse, upsize_add
 
 class ResNet34FPN(nn.Module):
-    def __init__(self, num_classes=4):
+    """
+    FPN with a pretrained ResNet34 encoder. Returns both the classification
+    label and the segmentation label
+    """
+    def __init__(self, num_classes=4, do_inference=False):
         super(ResNet34FPN, self).__init__()
+        print("This model returns probabilities, not logits! Please",
+              "make sure that you have the appropriate criterion selected.")
+        self.infer = do_inference
+        pretrained = False if self.infer else True
 
-        # e = ResNet34()
-        self.resnet = torchvision.models.resnet34(True)
+        self.resnet = torchvision.models.resnet34(pretrained=pretrained)
         self.conv1 = nn.Sequential(
             self.resnet.conv1,
             self.resnet.bn1,
@@ -72,4 +79,7 @@ class ResNet34FPN(nn.Module):
         #---
         probability_mask = torch.sigmoid(logit)
         probability_label = F.adaptive_max_pool2d(probability_mask, 1).view(batch_size,-1)
-        return (probability_label, probability_mask)
+        if self.infer:
+            return logit
+        else:
+            return (probability_label, probability_mask)
