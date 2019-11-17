@@ -17,18 +17,21 @@ def main(config):
     seed = config["io_params"]["split_seed"]
     seed_everything(seed)
     mode = config["mode"].lower()
-    assert mode in ["classification", "segmentation"], \
-        "The `mode` must be one of ['classification', 'segmentation']."
+    assert mode in ["both", "classification", "segmentation"], \
+        "The `mode` must be one of ['both', 'classification', 'segmentation']."
     if mode == "classification":
         exp = TrainClassificationExperiment(config)
+        output_key = "logits"
     elif mode == "segmentation":
         exp = TrainSegExperiment(config)
+        output_key = "logits"
     elif mode == "both":
         exp = TrainClfSegExperiment(config)
+        output_key = ["clf_logits", "seg_logits"]
 
     print(f"Seed: {seed}\nMode: {mode}")
 
-    runner = SupervisedRunner()
+    runner = SupervisedRunner(output_key=output_key)
 
     runner.train(
         model=exp.model,
