@@ -150,4 +150,5 @@ class ClfSegCloudDataset(CloudDataset):
             preprocessed = self.preprocessing(image=img, mask=mask)
             img = preprocessed["image"]
             mask = preprocessed["mask"]
-        return (img, class_label, mask)
+        return {"features": img, "seg_targets": mask,
+                "clf_targets": class_label}
