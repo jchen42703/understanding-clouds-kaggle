@@ -401,7 +401,7 @@ class TrainClfSegExperiment(TrainExperiment):
         loss_dict = {
             "bce_dice_loss": BCEDiceLoss(activation="sigmoid"),
             "bce": torch.nn.BCEWithLogitsLoss(),
-            "bce_no_logits": torch.nn.BCE(),
+            "bce_no_logits": torch.nn.BCELoss(),
             "focal_loss": FocalLoss(logits=False),
             "heng_focal_loss": HengFocalLoss(),
         }
@@ -415,9 +415,9 @@ class TrainClfSegExperiment(TrainExperiment):
         seg_kwargs = {} if seg_kwargs is None else seg_kwargs
         clf_kwargs = {} if clf_kwargs is None else clf_kwargs
 
-        seg_loss = loss_dict[seg_loss_name].__init__(**seg_kwargs)
-        clf_loss = loss_dict[clf_loss_name].__init__(**clf_kwargs)
-
+        seg_loss = loss_dict[seg_loss_name]
+        clf_loss = loss_dict[clf_loss_name]
+        seg_loss.__init__(**seg_kwargs), clf_loss.__init__(**clf_kwargs)
         criterion_dict = {seg_loss_name: seg_loss,
                           clf_loss_name: clf_loss}
         print(f"Criterion: {criterion_dict}")
