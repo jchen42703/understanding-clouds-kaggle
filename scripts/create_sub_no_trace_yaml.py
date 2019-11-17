@@ -1,20 +1,8 @@
 import gc
-import os
-import tqdm
-import cv2
 import torch
-import numpy as np
-import pandas as pd
-import segmentation_models_pytorch as smp
-import pickle
 
-from torch.utils.data import DataLoader
-
-from clouds.models import Pretrained
-from clouds.io import CloudDataset, ClassificationCloudDataset
 from clouds.inference import Inference
-from clouds.experiments.utils import get_validation_augmentation, \
-                                     get_preprocessing, setup_train_and_sub_df
+from clouds.experiments import GeneralInferExperiment
 
 def main(config):
     """
@@ -28,50 +16,10 @@ def main(config):
     """
     torch.cuda.empty_cache()
     gc.collect()
-    # setting up the test I/O
-    # setting up the train/val split with filenames
-    train_csv_path = config["train_csv_path"]
-    sample_sub_csv_path = config["sample_sub_csv_path"]
-    train_df, sub, _ = setup_train_and_sub_df(train_csv_path, sample_sub_csv_path)
-    test_ids = sub["Image_Label"].apply(lambda x: x.split("_")[0]).drop_duplicates().values
-    print(f"# of test ids: {len(test_ids)}")
-    n_encoded = len(sub["EncodedPixels"])
-    print(f"length of sub: {n_encoded}")
-    # datasets/data loaders
-    io_params = config["io_params"]
-    model_params = config["model_params"]
 
-    preprocessing_fn = smp.encoders.get_preprocessing_fn(model_params["encoders"][0],
-                                                         "imagenet")
-    preprocessing_transform = get_preprocessing(preprocessing_fn)
-    val_aug = get_validation_augmentation(io_params["aug_key"])
-    # fetching the proper datasets and models
-    print("Assuming that all encoders are from the same family...")
-    if config["mode"] == "segmentation":
-        test_dataset = CloudDataset(io_params["image_folder"], df=sub,
-                                    im_ids=test_ids,
-                                    transforms=val_aug,
-                                    preprocessing=preprocessing_transform)
-        pairs = list(zip(model_params["encoders"], model_params["decoders"]))
-        print(f"Models: {pairs}")
-        # setting up the seg model
-        models = [smp.__dict__[decoder](encoder_name=encoder,
-                                        encoder_weights=None,
-                                        classes=4, activation=None,
-                                        **model_params[decoder])
-                  for encoder, decoder in pairs]
-    elif config["mode"] == "classification":
-        test_dataset = ClassificationCloudDataset(io_params["image_folder"],
-                                                  df=sub, im_ids=test_ids,
-                                                  transforms=val_aug,
-                                                  preprocessing=preprocessing_transform)
-        models = [Pretrained(variant=name, num_classes=4, pretrained=False)
-                  for name in model_params["encoders"]]
-
-    test_loader = DataLoader(test_dataset, batch_size=io_params["batch_size"],
-                             shuffle=False, num_workers=io_params["num_workers"])
-    infer = Inference(config["checkpoint_paths"], test_loader,
-                      models=models, mode=config["mode"],
+    exp = GeneralInferExperiment(config)
+    infer = Inference(config["checkpoint_paths"], exp.loaders["test"],
+                      models=exp.models, mode=exp.mode,
                       **config["infer_params"])
     out_df = infer.create_sub(sub=sub)
 
