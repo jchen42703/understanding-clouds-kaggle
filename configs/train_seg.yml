@@ -16,7 +16,6 @@
       - 320
       - 640
 
-  loss: bce_dice_loss
   num_epochs: 17
   fp16: False
 
@@ -28,6 +27,9 @@
       decoder_use_batchnorm: True # inplace for InplaceABN
     fpn:
       dropout: 0.2
+
+  criterion_params:
+    loss: bce_dice_loss
 
   opt_params:
     opt: sgd

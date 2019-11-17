@@ -12,9 +12,12 @@
     num_workers: 2
     aug_key: aug1
 
-  loss: bce_dice_loss
-  model_name: se_resnext50_32x4d
+  model_params:
+    encoder: resnet34
   num_epochs: 17
+
+  criterion_params:
+    loss: bce_dice_loss
 
   opt_params:
     opt: sgd
