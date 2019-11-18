@@ -130,6 +130,7 @@ def get_training_augmentation(augmentation_key="aug5"):
                                                                    ratio=(0.75, 1.33)),
                                             albu.RandomCrop(height=696, width=1048)
                                            ], p=0.3),
+                                ],
                      }
     train_transform = transform_dict[augmentation_key]
     return albu.Compose(train_transform)
