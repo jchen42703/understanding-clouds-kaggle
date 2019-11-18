@@ -10,12 +10,13 @@ class ResNet34FPN(nn.Module):
     FPN with a pretrained ResNet34 encoder. Returns both the classification
     label and the segmentation label
     """
-    def __init__(self, num_classes=4, do_inference=False):
+    def __init__(self, num_classes=4, do_inference=False, fp16: bool = False):
         super(ResNet34FPN, self).__init__()
         if not do_inference:
             print("This model returns probabilities, not logits! Please",
                   "make sure that you have the appropriate criterion selected.")
         self.infer = do_inference
+        self.fp16 = fp16
         pretrained = False if self.infer else True
 
         self.resnet = torchvision.models.resnet34(pretrained=pretrained)
@@ -82,5 +83,8 @@ class ResNet34FPN(nn.Module):
         probability_label = F.adaptive_max_pool2d(probability_mask, 1).view(batch_size,-1)
         if self.infer:
             return logit
+        elif self.fp16:
+            # amp doesn't support regular BCELoss; only BCEWithLogitsLoss
+            return (probability_label, logit)
         else:
             return (probability_label, probability_mask)

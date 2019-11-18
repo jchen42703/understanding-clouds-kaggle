@@ -389,7 +389,7 @@ class TrainClfSegExperiment(TrainExperiment):
         print(f"\nEncoder: {encoder}, Decoder: {decoder}")
         assert encoder == "resnet34" and decoder == "fpn", \
             "Currently only ResNet34FPN is supported for CLF+Seg."
-        model = ResNet34FPN(num_classes=4)
+        model = ResNet34FPN(num_classes=4, fp16=self.config["fp16"])
         # calculating # of parameters
         total = sum(p.numel() for p in model.parameters())
         trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
