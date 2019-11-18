@@ -12,8 +12,9 @@ class ResNet34FPN(nn.Module):
     """
     def __init__(self, num_classes=4, do_inference=False):
         super(ResNet34FPN, self).__init__()
-        print("This model returns probabilities, not logits! Please",
-              "make sure that you have the appropriate criterion selected.")
+        if not do_inference:
+            print("This model returns probabilities, not logits! Please",
+                  "make sure that you have the appropriate criterion selected.")
         self.infer = do_inference
         pretrained = False if self.infer else True
 
