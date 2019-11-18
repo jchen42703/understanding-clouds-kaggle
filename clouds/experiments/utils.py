@@ -118,6 +118,18 @@ def get_training_augmentation(augmentation_key="aug5"):
                                            ], p=1),
                                 albu.Lambda(image=do_noise, p=0.5),
                               ],
+                      "aug8": [
+                                albu.HorizontalFlip(p=0.5),
+                                albu.VerticalFlip(p=0.5),
+                                albu.ShiftScaleRotate(scale_limit=0.1, rotate_limit=0,
+                                                      shift_limit=0.5, p=0.5,
+                                                      border_mode=0),
+                                albu.OneOf([
+                                            albu.RandomResizedCrop(height=696, width=1048,
+                                                                   scale=(1.0, 0.9),
+                                                                   ratio=(0.75, 1.33)),
+                                            albu.RandomCrop(height=696, width=1048)
+                                           ], p=0.3),
                      }
     train_transform = transform_dict[augmentation_key]
     return albu.Compose(train_transform)
