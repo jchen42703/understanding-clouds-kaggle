@@ -126,7 +126,8 @@ class GeneralInferExperiment(InferExperiment):
                                         df=self.sample_sub,
                                         im_ids=test_ids,
                                         transforms=val_aug,
-                                        preprocessing=preprocessing_transform)
+                                        preprocessing=preprocessing_transform,
+                                        mask_shape=self.io_params["mask_shape"])
         elif self.mode == "classification":
             test_dataset = ClassificationCloudDataset(self.io_params["image_folder"],
                                                       df=self.sample_sub,
