@@ -147,6 +147,7 @@ def get_validation_augmentation(augmentation_key="aug5"):
                       "aug5": [albu.RandomCrop(height=320, width=320, p=1)],
                       "aug6": [albu.RandomCrop(height=696, width=1048, p=1)],
                       "aug7": [albu.RandomCrop(height=688, width=1040, p=1)],
+                      "aug8": [],
                      }
     test_transform = transform_dict[augmentation_key]
     return albu.Compose(test_transform)
