@@ -15,6 +15,10 @@ class ResNet34FPN(nn.Module):
         if not do_inference:
             print("This model returns probabilities, not logits! Please",
                   "make sure that you have the appropriate criterion selected.")
+        elif fp16:
+            print("This model returns probability classification predictions",
+                  "and returns logit segmentation predictions.")
+
         self.infer = do_inference
         self.fp16 = fp16
         pretrained = False if self.infer else True
