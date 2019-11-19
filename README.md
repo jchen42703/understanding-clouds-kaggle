@@ -25,6 +25,13 @@ pip install .
 ```
 Annnd you're basically done!
 
+### Preprocessing the Dataset
+Assuming that you've already downloaded the dataset from Kaggle:
+```
+!python /content/understanding-clouds-kaggle/scripts/create_resized_dset.py  --yml_path="/content/understanding-clouds-kaggle/configs/create_dset.yml"
+```
+Feel free to change the parameters in the .yml file (such as the image sizes).
+
 ### Training
 ```
 # classification
@@ -32,6 +39,10 @@ Annnd you're basically done!
 
 # segmentation
 !python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/train_seg.yml"
+
+# classification + segmentation
+## Currently only compatible with the custom models.ResNet34FPN model!
+!python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/train_both.yml"
 ```
 
 ### Inference
