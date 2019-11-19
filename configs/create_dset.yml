@@ -1,0 +1,14 @@
+  paths_params:
+    train_csv_path: /content/train.csv
+    sample_sub_csv_path: /content/sample_submission.csv
+    train_dir: /content/train_images
+    test_dir: /content/test_images
+    train_out: train525_350.zip
+    test_out: test525_350.zip
+    mask_out: masks525_350.zip
+  process_train_test: True
+  process_masks: True
+  file_type: .jpg #.png
+  out_shape_cv2:
+    - 525
+    - 350

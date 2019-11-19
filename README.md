@@ -2,12 +2,12 @@
 Using convolutional neural networks for the segmentation of cloud structures from satellite images in [this kaggle challenge](https://www.kaggle.com/c/understanding_cloud_organization).
 
 ## Approach:
-* __Current Best Score (2 models):__ `0.660`
-* __Segmentation:__ seresnext50_unet/seresnext50_fpn/efficientnetb4_unet
-* __Classification to Remove FPs:__ se_resnext50_32x4d
+* __Current Best Score (4 models, 264th Place):__ Public LB: `0.6608`, Private LB: `0.65019`
+* __Segmentation:__ `seresnext50_unet/seresnext50_fpn/efficientnetb4_unet`
+* __Classification to Remove FPs:__ `se_resnext50_32x4d`
 
 ## Usage
-Look into `understanding-clouds-kaggle/scripts` and change the parameters in the respective configs `understanding-clouds-kaggle/experiments` if necessary. The current configs work for Google Colaboratory with non-mounted drives.
+Look into `understanding-clouds-kaggle/scripts` and change the parameters in the respective configs `understanding-clouds-kaggle/configs` if necessary. The current configs work for Google Colaboratory with non-mounted drives.
 
 ### Installation
 Make sure that you already have `torch>=1.2.0` and `torchvision>=0.4.0` installed! Everything else can be easily installed through:
@@ -25,22 +25,33 @@ pip install .
 ```
 Annnd you're basically done!
 
+### Preprocessing the Dataset
+Assuming that you've already downloaded the dataset from Kaggle:
+```
+!python /content/understanding-clouds-kaggle/scripts/create_resized_dset.py  --yml_path="/content/understanding-clouds-kaggle/configs/create_dset.yml"
+```
+Feel free to change the parameters in the .yml file (such as the image sizes).
+
 ### Training
 ```
 # classification
-!python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/experiments/train_classification.yml"
+!python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/train_classification.yml"
 
 # segmentation
-!python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/experiments/train_seg.yml"
+!python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/train_seg.yml"
+
+# classification + segmentation
+## Currently only compatible with the custom models.ResNet34FPN model!
+!python /content/understanding-clouds-kaggle/scripts/train_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/train_both.yml"
 ```
 
 ### Inference
 ```
 # classification
-!python understanding-clouds-kaggle/scripts/create_sub_no_trace_yaml.py --yml_path="/content/understanding-clouds-kaggle/experiments/create_sub_clf.yml"
+!python understanding-clouds-kaggle/scripts/create_sub_no_trace_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/create_sub_clf.yml"
 
 # segmentation
-!python understanding-clouds-kaggle/scripts/create_sub_no_trace_yaml.py --yml_path="/content/understanding-clouds-kaggle/experiments/create_sub_seg.yml"
+!python understanding-clouds-kaggle/scripts/create_sub_no_trace_yaml.py --yml_path="/content/understanding-clouds-kaggle/configs/create_sub_seg.yml"
 ```
 
 ### Cascade

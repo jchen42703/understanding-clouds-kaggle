@@ -13,11 +13,13 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, \
                                      CosineAnnealingWarmRestarts, CyclicLR
-
-from clouds.models import Pretrained
-from clouds.io import ClassificationCloudDataset, CloudDataset
-from utils import get_preprocessing, get_training_augmentation, get_validation_augmentation, \
-                  setup_train_and_sub_df, seed_everything
+from clouds.models import Pretrained, ResNet34FPN
+from clouds.metrics import BCEDiceLoss, FocalLoss, HengFocalLoss
+from clouds.io import ClassificationCloudDataset, CloudDataset, \
+                      ClfSegCloudDataset
+from .utils import get_preprocessing, get_training_augmentation, \
+                   get_validation_augmentation, setup_train_and_sub_df, \
+                   seed_everything
 
 class TrainExperiment(object):
     def __init__(self, config: dict):
@@ -68,6 +70,8 @@ class TrainExperiment(object):
         self.io_params = config["io_params"]
         self.opt_params = config["opt_params"]
         self.cb_params = config["callback_params"]
+        self.model_params = config["model_params"]
+        self.criterion_params = config["criterion_params"]
         # initializing the experiment components
         self.df, _, self.id_mask_count = self.setup_df()
         train_ids, val_ids = self.get_split()
@@ -177,7 +181,7 @@ class TrainExperiment(object):
         return scheduler
 
     def get_criterion(self):
-        loss_name = self.config["loss"].lower()
+        loss_name = self.criterion_params["loss"].lower()
         if loss_name == "bce_dice_loss":
             criterion = smp.utils.losses.BCEDiceLoss(eps=1.)
         elif loss_name == "bce":
@@ -210,7 +214,7 @@ class TrainExperiment(object):
                 self.model = load_weights_train(ckpoint_params["checkpoint_path"], self.model)
         return callbacks_list
 
-class TrainClassificationExperimentFromConfig(TrainExperiment):
+class TrainClassificationExperiment(TrainExperiment):
     """
     Stores the main parts of a classification experiment:
     - df split
@@ -234,7 +238,7 @@ class TrainClassificationExperimentFromConfig(TrainExperiment):
         Creates and returns the train and validation datasets.
         """
         # preparing transforms
-        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.config["model_name"],
+        preprocessing_fn = smp.encoders.get_preprocessing_fn(self.model_params["encoder"],
                                                              "imagenet")
         preprocessing_transform = get_preprocessing(preprocessing_fn)
         train_aug = get_training_augmentation(self.io_params["aug_key"])
@@ -254,13 +258,84 @@ class TrainClassificationExperimentFromConfig(TrainExperiment):
 
     def get_model(self):
         # setting up the classification model
-        model = Pretrained(variant=self.config["model_name"], num_classes=4,
+        model = Pretrained(variant=self.model_params["encoder"], num_classes=4,
                            pretrained=True, activation=None)
         return model
 
-class TrainSegExperimentFromConfig(TrainExperiment):
+class TrainSegExperiment(TrainExperiment):
     """
     Stores the main parts of a segmentation experiment:
+    - df split
+    - datasets
+    - loaders
+    - model
+    - optimizer
+    - lr_scheduler
+    - criterion
+    - callbacks
+    Note: There is no model_name for this experiment. There is `encoder` and
+    `decoder` under `model_params`. You can also specify the attention_type
+    """
+    def __init__(self, config: dict):
+        """
+        Args:
+            config (dict): from `train_seg_yaml.py`
+        """
+        super().__init__(config=config)
+
+    def get_datasets(self, train_ids, valid_ids):
+        """
+        Creates and returns the train and validation datasets.
+        """
+        # preparing transforms
+        encoder = self.model_params["encoder"]
+        preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder,
+                                                             "imagenet")
+        preprocessing_transform = get_preprocessing(preprocessing_fn)
+        train_aug = get_training_augmentation(self.io_params["aug_key"])
+        val_aug = get_validation_augmentation(self.io_params["aug_key"])
+        # creating the datasets
+        train_dataset = CloudDataset(self.io_params["image_folder"],
+                                     df=self.df,
+                                     im_ids=train_ids,
+                                     masks_folder=self.io_params["masks_folder"],
+                                     transforms=train_aug,
+                                     preprocessing=preprocessing_transform,
+                                     mask_shape=self.io_params["mask_shape"])
+        valid_dataset = CloudDataset(self.io_params["image_folder"],
+                                     df=self.df,
+                                     im_ids=valid_ids,
+                                     masks_folder=self.io_params["masks_folder"],
+                                     transforms=val_aug,
+                                     preprocessing=preprocessing_transform,
+                                     mask_shape=self.io_params["mask_shape"])
+        return (train_dataset, valid_dataset)
+
+    def get_model(self):
+        encoder = self.model_params["encoder"].lower()
+        decoder = self.model_params["decoder"].lower()
+        print(f"\nEncoder: {encoder}, Decoder: {decoder}")
+        # setting up the seg model
+        assert decoder in ["unet", "fpn"], \
+            "`decoder` must be one of ['unet', 'fpn']"
+        if decoder == "unet":
+            model = smp.Unet(encoder_name=encoder, encoder_weights="imagenet",
+                             classes=4, activation=None,
+                             **self.model_params[decoder])
+        elif decoder == "fpn":
+            model = smp.FPN(encoder_name=encoder, encoder_weights="imagenet",
+                            classes=4, activation=None,
+                            **self.model_params[decoder])
+        # calculating # of parameters
+        total = sum(p.numel() for p in model.parameters())
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"Total # of Params: {total}\nTrainable params: {trainable}")
+
+        return model
+
+class TrainClfSegExperiment(TrainExperiment):
+    """
+    Stores the main parts of a classification + segmentation experiment:
     - df split
     - datasets
     - loaders
@@ -292,41 +367,101 @@ class TrainSegExperimentFromConfig(TrainExperiment):
         train_aug = get_training_augmentation(self.io_params["aug_key"])
         val_aug = get_validation_augmentation(self.io_params["aug_key"])
         # creating the datasets
-        train_dataset = CloudDataset(self.io_params["image_folder"],
-                                     df=self.df,
-                                     im_ids=train_ids,
-                                     masks_folder=self.io_params["masks_folder"],
-                                     transforms=train_aug,
-                                     preprocessing=preprocessing_transform)
-        valid_dataset = CloudDataset(self.io_params["image_folder"],
-                                     df=self.df,
-                                     im_ids=valid_ids,
-                                     masks_folder=self.io_params["masks_folder"],
-                                     transforms=val_aug,
-                                     preprocessing=preprocessing_transform)
+        train_dataset = ClfSegCloudDataset(self.io_params["image_folder"],
+                                           df=self.df,
+                                           im_ids=train_ids,
+                                           masks_folder=self.io_params["masks_folder"],
+                                           transforms=train_aug,
+                                           preprocessing=preprocessing_transform,
+                                           mask_shape=self.io_params["mask_shape"])
+        valid_dataset = ClfSegCloudDataset(self.io_params["image_folder"],
+                                           df=self.df,
+                                           im_ids=valid_ids,
+                                           masks_folder=self.io_params["masks_folder"],
+                                           transforms=val_aug,
+                                           preprocessing=preprocessing_transform,
+                                           mask_shape=self.io_params["mask_shape"])
         return (train_dataset, valid_dataset)
 
     def get_model(self):
         encoder = self.model_params["encoder"].lower()
         decoder = self.model_params["decoder"].lower()
         print(f"\nEncoder: {encoder}, Decoder: {decoder}")
-        # setting up the seg model
-        assert decoder in ["unet", "fpn"], \
-            "`decoder` must be one of ['unet', 'fpn']"
-        if decoder == "unet":
-            model = smp.Unet(encoder_name=encoder, encoder_weights="imagenet",
-                             classes=4, activation=None,
-                             **self.model_params[decoder])
-        elif decoder == "fpn":
-            model = smp.FPN(encoder_name=encoder, encoder_weights="imagenet",
-                            classes=4, activation=None,
-                            **self.model_params[decoder])
+        assert encoder == "resnet34" and decoder == "fpn", \
+            "Currently only ResNet34FPN is supported for CLF+Seg."
+        model = ResNet34FPN(num_classes=4, fp16=self.config["fp16"])
         # calculating # of parameters
         total = sum(p.numel() for p in model.parameters())
         trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"Total # of Params: {total}\nTrainable params: {trainable}")
 
         return model
+
+    def get_criterion(self):
+        loss_dict = {
+            "bce_dice_loss": BCEDiceLoss(activation="sigmoid"),
+            "bce": torch.nn.BCEWithLogitsLoss(),
+            "bce_no_logits": torch.nn.BCELoss(),
+            "focal_loss": FocalLoss(logits=False),
+            "heng_focal_loss": HengFocalLoss(),
+        }
+
+        seg_loss_name = self.criterion_params["seg_loss"].lower()
+        clf_loss_name = self.criterion_params["clf_loss"].lower()
+
+        # re-initializing criterion with kwargs
+        seg_kwargs = self.criterion_params.get(seg_loss_name)
+        clf_kwargs = self.criterion_params.get(clf_loss_name)
+        seg_kwargs = {} if seg_kwargs is None else seg_kwargs
+        clf_kwargs = {} if clf_kwargs is None else clf_kwargs
+
+        seg_loss = loss_dict[seg_loss_name]
+        clf_loss = loss_dict[clf_loss_name]
+        seg_loss.__init__(**seg_kwargs), clf_loss.__init__(**clf_kwargs)
+        criterion_dict = {seg_loss_name: seg_loss,
+                          clf_loss_name: clf_loss}
+        print(f"Criterion: {criterion_dict}")
+        return criterion_dict
+
+    def get_callbacks(self):
+        from catalyst.dl.callbacks import CriterionAggregatorCallback, \
+                                          CriterionCallback
+        seg_loss_name = self.criterion_params["seg_loss"].lower()
+        clf_loss_name = self.criterion_params["clf_loss"].lower()
+        callbacks_list = [
+                          CriterionCallback(prefix="seg_loss",
+                                            input_key="seg_targets",
+                                            output_key="seg_logits",
+                                            criterion_key=seg_loss_name),
+                          CriterionCallback(prefix="clf_loss",
+                                            input_key="clf_targets",
+                                            output_key="clf_logits",
+                                            criterion_key=clf_loss_name),
+                          CriterionAggregatorCallback(prefix="loss",
+                                                      loss_keys=\
+                                                      ["seg_loss", "clf_loss"]),
+                          EarlyStoppingCallback(**self.cb_params["earlystop"]),
+                          ]
+
+        ckpoint_params = self.cb_params["checkpoint_params"]
+        if ckpoint_params["checkpoint_path"] != None: # hacky way to say no checkpoint callback but eh what the heck
+            mode = ckpoint_params["mode"].lower()
+            if mode == "full":
+                print("Stateful loading...")
+                ckpoint_p = Path(ckpoint_params["checkpoint_path"])
+                fname = ckpoint_p.name
+                # everything in the path besides the base file name
+                resume_dir = str(ckpoint_p.parents[0])
+                print(f"Loading {fname} from {resume_dir}. \
+                      \nCheckpoints will also be saved in {resume_dir}.")
+                # adding the checkpoint callback
+                callbacks_list = callbacks_list + [CheckpointCallback(resume=fname,
+                                                                      resume_dir=resume_dir),]
+            elif mode == "model_only":
+                print("Loading weights into model...")
+                self.model = load_weights_train(ckpoint_params["checkpoint_path"], self.model)
+        print(f"Callbacks: {callbacks_list}")
+        return callbacks_list
 
 def load_weights_train(checkpoint_path, model):
     """

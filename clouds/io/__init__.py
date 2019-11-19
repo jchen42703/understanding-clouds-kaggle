@@ -1,1 +1,2 @@
-from .dataset import CloudDataset, ClassificationCloudDataset
+from .dataset import CloudDataset, ClassificationCloudDataset, \
+                     ClfSegCloudDataset

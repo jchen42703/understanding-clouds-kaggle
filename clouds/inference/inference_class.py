@@ -28,7 +28,7 @@ class Inference(object):
         self.mode = mode
         self.loader = test_loader
         if class_params is None:
-            if mode == "segmentation":
+            if mode == "segmentation" or mode == "both":
                 # class: (threshold, min_size)
                 self.class_params = {0: (0.5, 10000), 1: (0.5, 10000),
                                      2: (0.5, 10000), 3: (0.5, 10000)}
@@ -89,7 +89,7 @@ class Inference(object):
         Returns:
             submission (pd.DataFrame): submission dataframe
         """
-        if self.mode == "segmentation":
+        if self.mode == "segmentation" or self.mode == "both":
             print("Segmentation: Converting predicted masks to run-length-encodings...")
             save_path = os.path.join(os.getcwd(), "submission.csv")
             encoded_pixels = self.get_encoded_pixels()

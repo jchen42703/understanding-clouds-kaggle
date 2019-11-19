@@ -1,37 +1,37 @@
 from clouds import Preprocessor
+from clouds.experiments import setup_train_and_sub_df
 
-def main(args):
-    train, sub, _ = setup_train_and_sub_df(args.dset_path)
-    COLAB_PATHS_DICT = {
-        "train_dir": "./train_images/"
-        "test_dir": "./test_images/"
-        "train_out": "train640.zip"
-        "test_out": "test640.zip"
-        "mask_out": "masks640.zip"
+def main(config):
+    paths_params = config["paths_params"]
+    paths_dict = {
+        "train_dir": paths_params["train_dir"],
+        "test_dir": paths_params["test_dir"],
+        "train_out": paths_params["train_out"],
+        "test_out": paths_params["test_out"],
+        "mask_out": paths_params["mask_out"],
     }
-    preprocessor = Preprocessor(train, COLAB_PATHS_DICT, args.out_shape_cv2,
-                                args.file_type)
-    if args.process_train_test:
+    train, sub, _ = setup_train_and_sub_df(paths_params["train_csv_path"],
+                                           paths_params["sample_sub_csv_path"])
+    preprocessor = Preprocessor(train, paths_dict, tuple(config["out_shape_cv2"]),
+                                config["file_type"])
+    if config["process_train_test"]:
         preprocessor.execute_train_test()
-    if args.process_masks:
+    if config["process_masks"]:
         preprocessor.execute_masks()
 
 if __name__ == "__main__":
+    import yaml
     import argparse
-    from parsing_utils import add_bool_arg
 
-    # parsing the arguments from the command prompt
-    parser = argparse.ArgumentParser(description="For creating the resized dataset.")
-    parser.add_argument("--dset_path", type=str, required=True,
-                        help="Path to the unzipped kaggle dataset directory.")
-    add_bool_arg(parser, "process_train_test", default=True)
-    add_bool_arg(parser, "process_masks", default=True)
-    parser.add_argument("--file_type", type=str, required=False, default=".jpg",
-                        help="file type")
-    parser.add_argument("--out_shape_cv2", n_args="+", type=str, required=False,
-                        default=[640, 320], help="Shape to resize to in cv2")
-
-
-
+    parser = argparse.ArgumentParser(description="For training.")
+    parser.add_argument("--yml_path", type=str, required=True,
+                        help="Path to the .yml config.")
     args = parser.parse_args()
-    main(args)
+
+    with open(args.yml_path, 'r') as stream:
+        try:
+            config = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+
+    main(config)
